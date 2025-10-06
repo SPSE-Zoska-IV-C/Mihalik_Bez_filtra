@@ -1,0 +1,66 @@
+:root {
+  --bg: #0f172a;
+  --fg: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #22d3ee;
+  --card: #111827;
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+.container {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.site-header {
+  background: linear-gradient(90deg, #0ea5e9, #22d3ee);
+  color: #0b1020;
+}
+.site-header .brand { margin: 0; }
+.site-header nav { display: flex; gap: 1rem; align-items: center; }
+.site-header a { color: #0b1020; text-decoration: none; font-weight: 600; }
+
+h2 { margin-top: 1rem; }
+
+.btn {
+  display: inline-block;
+  background: var(--accent);
+  color: #0b1020 !important;
+  padding: 0.5rem 0.9rem;
+  border-radius: 0.5rem;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.article-list { list-style: none; padding: 0; }
+.article-item {
+  background: var(--card);
+  border: 1px solid #1f2937;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  margin-bottom: 1rem;
+}
+.article-item small { color: var(--muted); }
+
+.form { display: grid; gap: 1rem; max-width: 700px; }
+.form-group { display: grid; gap: 0.5rem; }
+input[type="text"], textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid #334155;
+  background: #0b1220;
+  color: var(--fg);
+}
+
+
