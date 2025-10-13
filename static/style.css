@@ -2,7 +2,7 @@
   --bg: #0f172a;
   --fg: #e2e8f0;
   --muted: #94a3b8;
-  --accent: #22d3ee;
+  --accent: #22d3ee; /* turquoise */
   --card: #111827;
 }
 
@@ -42,6 +42,34 @@ h2 { margin-top: 1rem; }
   font-weight: 700;
 }
 
+/* Turquoise theme utilities */
+.btn-turquoise {
+  background-color: var(--accent) !important;
+  color: #0b1020 !important;
+  border: 0;
+  border-radius: 0.5rem;
+  transition: transform 0.08s ease, filter 0.15s ease;
+}
+.btn-turquoise:hover { filter: brightness(0.95); transform: translateY(-1px); }
+.btn-turquoise:active { transform: translateY(0); }
+
+.navbar-turquoise {
+  background: linear-gradient(90deg, #14b8a6, #06b6d4, #22d3ee);
+}
+.navbar-turquoise .navbar-brand,
+.navbar-turquoise .nav-link,
+.navbar-turquoise .navbar-text { color: #ffffff !important; }
+.navbar-turquoise .nav-link.active,
+.navbar-turquoise .nav-link:hover { color: #ecfeff !important; }
+
+.form-container {
+  background: var(--card);
+  border: 1px solid #1f2937;
+  border-radius: 0.75rem;
+  padding: 2rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+}
+
 .article-list { list-style: none; padding: 0; }
 .article-item {
   background: var(--card);
@@ -55,6 +83,16 @@ h2 { margin-top: 1rem; }
 .form { display: grid; gap: 1rem; max-width: 700px; }
 .form-group { display: grid; gap: 0.5rem; }
 input[type="text"], textarea {
+  width: 100%;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid #334155;
+  background: #0b1220;
+  color: var(--fg);
+}
+
+/* Inputs for auth forms */
+input[type="email"], input[type="password"] {
   width: 100%;
   padding: 0.6rem 0.75rem;
   border-radius: 0.5rem;

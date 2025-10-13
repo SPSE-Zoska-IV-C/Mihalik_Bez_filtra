@@ -15,9 +15,14 @@ def register():
         username = request.form.get("username", "").strip()
         email = request.form.get("email", "").strip().lower()
         password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
 
         if not username or not email or not password:
             flash("All fields are required.", "danger")
+            return render_template("auth/register.html")
+
+        if password != confirm_password:
+            flash("Passwords do not match.", "danger")
             return render_template("auth/register.html")
 
         if User.query.filter((User.username == username) | (User.email == email)).first():
@@ -38,9 +43,12 @@ def login():
     if current_user.is_authenticated:
         return redirect(url_for("list_articles"))
     if request.method == "POST":
-        email = request.form.get("email", "").strip().lower()
+        identifier = request.form.get("identifier", "").strip()
         password = request.form.get("password", "")
-        user = User.query.filter_by(email=email).first()
+        # Try lookup by email first, then by username
+        user = User.query.filter_by(email=identifier.lower()).first()
+        if user is None:
+            user = User.query.filter_by(username=identifier).first()
         if user and user.check_password(password):
             login_user(user)
             flash("Logged in successfully.", "success")

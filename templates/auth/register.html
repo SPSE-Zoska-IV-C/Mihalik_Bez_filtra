@@ -1,22 +1,41 @@
 {% extends 'base.html' %}
 {% block content %}
-  <h2>Register</h2>
-  <form method="post" class="form">
-    <div class="form-group">
-      <label for="username">Username</label>
-      <input type="text" id="username" name="username" required />
+  <div class="row justify-content-center">
+    <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5">
+      <div class="card shadow-sm rounded-3 my-4">
+        <div class="card-body p-4 p-md-5">
+          <h2 class="h4 mb-4 text-center">Create your account</h2>
+          <form method="post" novalidate>
+            <div class="mb-3">
+              <label class="form-label" for="username">Username</label>
+              <input class="form-control" type="text" id="username" name="username" placeholder="yourname" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="email">Email</label>
+              <input class="form-control" type="email" id="email" name="email" placeholder="name@example.com" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="password">Password</label>
+              <input class="form-control" type="password" id="password" name="password" placeholder="••••••••" required />
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="confirm_password">Confirm Password</label>
+              <input class="form-control" type="password" id="confirm_password" name="confirm_password" placeholder="••••••••" required />
+            </div>
+            <div class="d-grid gap-2">
+              <button class="btn btn-turquoise" type="submit">Register</button>
+            </div>
+          </form>
+          <div class="text-center mt-3">
+            <small>Already have an account?</small>
+            <div class="mt-2">
+              <a class="btn btn-turquoise" href="{{ url_for('auth.login') }}">Login here</a>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-    <div class="form-group">
-      <label for="email">Email</label>
-      <input type="email" id="email" name="email" required />
-    </div>
-    <div class="form-group">
-      <label for="password">Password</label>
-      <input type="password" id="password" name="password" required />
-    </div>
-    <button class="btn" type="submit">Create account</button>
-  </form>
-  <p>Already have an account? <a href="{{ url_for('auth.login') }}">Login</a></p>
+  </div>
 {% endblock %}
 
 
