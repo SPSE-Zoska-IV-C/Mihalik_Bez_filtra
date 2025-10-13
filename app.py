@@ -1,39 +1,28 @@
 from datetime import datetime
 from flask import Flask, render_template, request, redirect, url_for
-from flask_sqlalchemy import SQLAlchemy
+from flask_login import login_required, current_user
+from extensions import db, bcrypt, login_manager, migrate
+from models import Article
+from routes.auth import auth_bp
 
 
 app = Flask(__name__)
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///site.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SECRET_KEY"] = "change-this-secret-key"
 
-db = SQLAlchemy(app)
+db.init_app(app)
+bcrypt.init_app(app)
+login_manager.init_app(app)
+migrate.init_app(app, db)
 
-
-class User(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password = db.Column(db.String(128), nullable=False)
-    articles = db.relationship("Article", backref="author", lazy=True)
+app.register_blueprint(auth_bp)
 
 
-class Article(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.String(200), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+ 
 
 
-def get_or_create_default_user() -> User:
-    default_username = "admin"
-    user = User.query.filter_by(username=default_username).first()
-    if user is None:
-        user = User(username=default_username, email="admin@example.com", password="changeme")
-        db.session.add(user)
-        db.session.commit()
-    return user
+ 
 
 
 @app.get("/")
@@ -48,13 +37,13 @@ def list_articles():
 
 
 @app.route("/add_article", methods=["GET", "POST"])
+@login_required
 def add_article():
     if request.method == "POST":
         title = request.form.get("title", "").strip()
         content = request.form.get("content", "").strip()
         if title and content:
-            author = get_or_create_default_user()
-            article = Article(title=title, content=content, author=author)
+            article = Article(title=title, content=content, author=current_user)
             db.session.add(article)
             db.session.commit()
             return redirect(url_for("list_articles"))
@@ -62,8 +51,5 @@ def add_article():
 
 
 if __name__ == "__main__":
-    with app.app_context():
-        db.create_all()
-        get_or_create_default_user()
     app.run(debug=True)
 
