@@ -66,3 +66,9 @@ def logout():
     return redirect(url_for("auth.login"))
 
 
+@auth_bp.route("/settings")
+@login_required
+def settings():
+    return render_template("auth/settings.html")
+
+

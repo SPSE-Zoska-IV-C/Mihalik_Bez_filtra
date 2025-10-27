@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+{% block content %}
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <!-- Article Card -->
+      <div class="card mb-4">
+        <div class="card-body">
+          <h2 class="card-title">{{ article.title }}</h2>
+          <p class="text-muted">
+            by <strong>{{ article.author.username }}</strong> on {{ article.date_posted.strftime('%Y-%m-%d %H:%M') }}
+          </p>
+          <hr>
+          <div class="card-text">
+            {{ article.content }}
+          </div>
+          
+          {% if current_user.is_authenticated %}
+          <div class="mt-3">
+            <button 
+              class="btn like-btn {% if user_reaction and user_reaction.liked %}btn-success{% else %}btn-outline-primary{% endif %}" 
+              data-article-id="{{ article.id }}"
+              onclick="toggleLike({{ article.id }})"
+            >
+              👍 Like
+            </button>
+            <span class="badge bg-primary ms-2 like-count-{{ article.id }}">
+              {{ like_count }} likes
+            </span>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Comments Section -->
+      <div class="card">
+        <div class="card-body">
+          <h4>Comments</h4>
+          
+          {% if current_user.is_authenticated %}
+          <!-- Comment Form -->
+          <div class="mb-4">
+            <form id="commentForm">
+              <div class="mb-3">
+                <label for="commentText" class="form-label">Add a comment:</label>
+                <textarea class="form-control" id="commentText" rows="3" placeholder="Write your comment here..." required></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary">Post Comment</button>
+            </form>
+          </div>
+          <hr>
+          {% endif %}
+
+          <!-- Comments List -->
+          <div id="commentsList">
+            {% if comments %}
+              {% for comment in comments %}
+              <div class="mb-3 comment-item" id="comment-{{ comment.id }}">
+                <div class="d-flex align-items-start">
+                  <div class="flex-grow-1">
+                    <p class="mb-1">
+                      <strong>{{ comment.author.username }}</strong>
+                      <small class="text-muted ms-2">{{ comment.date_posted.strftime('%Y-%m-%d %H:%M') }}</small>
+                    </p>
+                    <p class="mb-0">{{ comment.content }}</p>
+                  </div>
+                </div>
+                {% if not loop.last %}<hr class="my-3">{% endif %}
+              </div>
+              {% endfor %}
+            {% else %}
+              <p class="text-muted">No comments yet. Be the first to comment!</p>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Back to Articles -->
+      <div class="mt-3">
+        <a href="{{ url_for('list_articles') }}" class="btn btn-secondary">← Back to Articles</a>
+      </div>
+    </div>
+  </div>
+
+  {% if current_user.is_authenticated %}
+  <script>
+    function toggleLike(articleId) {
+      fetch(`/article/${articleId}/like`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          const likeBtn = document.querySelector(`.like-btn[data-article-id="${articleId}"]`);
+          if (data.liked) {
+            likeBtn.classList.remove('btn-outline-primary');
+            likeBtn.classList.add('btn-success');
+          } else {
+            likeBtn.classList.remove('btn-success');
+            likeBtn.classList.add('btn-outline-primary');
+          }
+          const likeCount = document.querySelector(`.like-count-${articleId}`);
+          likeCount.textContent = data.like_count + ' likes';
+        }
+      })
+      .catch(error => console.error('Error:', error));
+    }
+
+    // Handle comment form submission
+    document.getElementById('commentForm').addEventListener('submit', function(e) {
+      e.preventDefault();
+      const content = document.getElementById('commentText').value.trim();
+      if (!content) return;
+
+      const formBtn = this.querySelector('button[type="submit"]');
+      const originalText = formBtn.textContent;
+      formBtn.disabled = true;
+      formBtn.textContent = 'Posting...';
+
+      fetch(`/article/{{ article.id }}/comment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ content: content })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          // Add new comment to the list
+          const commentsList = document.getElementById('commentsList');
+          const isEmpty = commentsList.querySelector('p.text-muted');
+          
+          if (isEmpty) {
+            commentsList.innerHTML = '';
+          }
+          
+          const commentHtml = `
+            <div class="mb-3 comment-item" id="comment-${data.comment.id}">
+              <div class="d-flex align-items-start">
+                <div class="flex-grow-1">
+                  <p class="mb-1">
+                    <strong>${data.comment.author}</strong>
+                    <small class="text-muted ms-2">${data.comment.date_posted}</small>
+                  </p>
+                  <p class="mb-0">${data.comment.content}</p>
+                </div>
+              </div>
+              <hr class="my-3">
+            </div>
+          `;
+          
+          commentsList.insertAdjacentHTML('beforeend', commentHtml);
+          
+          // Clear form
+          document.getElementById('commentText').value = '';
+        }
+        formBtn.disabled = false;
+        formBtn.textContent = originalText;
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        formBtn.disabled = false;
+        formBtn.textContent = originalText;
+        alert('Failed to post comment. Please try again.');
+      });
+    });
+  </script>
+  {% endif %}
+{% endblock %}
+

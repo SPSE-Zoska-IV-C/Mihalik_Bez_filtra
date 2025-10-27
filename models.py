@@ -31,5 +31,30 @@ class Article(db.Model):
     content = db.Column(db.Text, nullable=False)
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    
+    reactions = db.relationship("ArticleReaction", backref="article", lazy=True, cascade="all, delete-orphan")
+    user_comments = db.relationship("Comment", backref="article_comments", lazy=True, cascade="all, delete-orphan")
+
+
+class ArticleReaction(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    article_id = db.Column(db.Integer, db.ForeignKey("article.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    liked = db.Column(db.Boolean, default=False, nullable=False)
+    date_reacted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    __table_args__ = (db.UniqueConstraint('article_id', 'user_id'),)
+
+
+class Comment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    article_id = db.Column(db.Integer, db.ForeignKey("article.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Relationship to Article and User
+    article = db.relationship("Article", backref="comments", lazy=True)
+    author = db.relationship("User", backref="comments", lazy=True)
 
 

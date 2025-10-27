@@ -21,7 +21,20 @@
             <li class="nav-item"><a class="nav-link" href="{{ url_for('add_article') }}">Add Article</a></li>
           </ul>
           <div class="d-flex">
-            <a class="btn btn-turquoise" href="{{ url_for('auth.login') }}">Login</a>
+            {% if current_user.is_authenticated %}
+              <div class="dropdown">
+                <button class="btn btn-turquoise dropdown-toggle" type="button" id="userMenuDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                  {{ current_user.username }}
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuDropdown">
+                  <li><a class="dropdown-item" href="{{ url_for('auth.settings') }}">Settings</a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">Logout</a></li>
+                </ul>
+              </div>
+            {% else %}
+              <a class="btn btn-turquoise" href="{{ url_for('auth.login') }}">Login</a>
+            {% endif %}
           </div>
         </div>
       </div>

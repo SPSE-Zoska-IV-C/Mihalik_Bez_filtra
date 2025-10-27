@@ -2,17 +2,79 @@
 {% block content %}
   <h2>Articles</h2>
   {% if articles %}
-    <ul class="article-list">
+    <div class="row">
       {% for article in articles %}
-        <li class="article-item">
-          <h3>{{ article.title }}</h3>
-          <small>by {{ article.author.username }} on {{ article.date_posted.strftime('%Y-%m-%d %H:%M') }}</small>
-          <p>{{ article.content }}</p>
-        </li>
+        <div class="col-md-6 mb-4">
+          <div class="card shadow-sm border-primary h-100">
+            <div class="card-body">
+              <h4 class="card-title">
+                <a href="{{ url_for('article_detail', article_id=article.id) }}" class="text-decoration-none text-primary">
+                  {{ article.title }}
+                </a>
+              </h4>
+              <small class="text-muted d-block mb-2">
+                by <strong>{{ article.author.username }}</strong> on {{ article.date_posted.strftime('%Y-%m-%d %H:%M') }}
+              </small>
+              <p class="card-text">{{ article.content[:150] }}{% if article.content|length > 150 %}...{% endif %}</p>
+              
+              {% if current_user.is_authenticated %}
+              <div class="mt-auto">
+                <a href="{{ url_for('article_detail', article_id=article.id) }}" class="btn btn-primary btn-sm">
+                  Read More →
+                </a>
+                <button 
+                  class="btn like-btn btn-sm ms-2 {% if user_reactions.get(article.id) and user_reactions[article.id].liked %}btn-success{% else %}btn-outline-primary{% endif %}" 
+                  data-article-id="{{ article.id }}"
+                  onclick="toggleLike({{ article.id }})"
+                >
+                  👍
+                </button>
+                <span class="badge bg-primary ms-1 like-count-{{ article.id }}">
+                  {{ article_stats[article.id].like_count }}
+                </span>
+              </div>
+              {% else %}
+              <a href="{{ url_for('article_detail', article_id=article.id) }}" class="btn btn-primary btn-sm mt-2">
+                Read More →
+              </a>
+              {% endif %}
+            </div>
+          </div>
+        </div>
       {% endfor %}
-    </ul>
+    </div>
   {% else %}
     <p>No articles yet. <a href="{{ url_for('add_article') }}">Add the first one</a>.</p>
+  {% endif %}
+
+  {% if current_user.is_authenticated %}
+  <script>
+    function toggleLike(articleId) {
+      fetch(`/article/${articleId}/like`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        }
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          const likeBtn = document.querySelector(`.like-btn[data-article-id="${articleId}"]`);
+          if (data.liked) {
+            likeBtn.classList.remove('btn-outline-primary');
+            likeBtn.classList.add('btn-success');
+          } else {
+            likeBtn.classList.remove('btn-success');
+            likeBtn.classList.add('btn-outline-primary');
+          }
+          const likeCount = document.querySelector(`.like-count-${articleId}`);
+          likeCount.textContent = data.like_count;
+        }
+      })
+      .catch(error => console.error('Error:', error));
+    }
+  </script>
   {% endif %}
 {% endblock %}
 
