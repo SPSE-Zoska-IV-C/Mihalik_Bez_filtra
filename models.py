@@ -2,11 +2,9 @@ from datetime import datetime
 from flask_login import UserMixin
 from extensions import db, bcrypt, login_manager
 
-
 @login_manager.user_loader
 def load_user(user_id: str):
     return User.query.get(int(user_id))
-
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -29,6 +27,10 @@ class Article(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
+    summary = db.Column(db.Text)
+    photo = db.Column(db.String(500))
+    source_url = db.Column(db.String(500))
+    ai_generated = db.Column(db.Boolean, nullable=False, default=False)
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     
@@ -56,5 +58,3 @@ class Comment(db.Model):
     # Relationship to Article and User
     article = db.relationship("Article", backref="comments", lazy=True)
     author = db.relationship("User", backref="comments", lazy=True)
-
-

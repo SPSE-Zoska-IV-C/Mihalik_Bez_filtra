@@ -1,12 +1,20 @@
 {% extends 'base.html' %}
 {% block content %}
-  <h2>Articles</h2>
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h2 class="mb-0">Articles</h2>
+    {% if current_user.is_authenticated %}
+    <form method="post" action="{{ url_for('fetch_article') }}">
+      <button type="submit" class="btn btn-warning">Fetch New Article</button>
+    </form>
+    {% endif %}
+  </div>
   {% if articles %}
     <div class="row">
       {% for article in articles %}
         <div class="col-md-6 mb-4">
           <div class="card shadow-sm border-primary h-100">
-            <div class="card-body">
+            <img src="{{ article.photo or 'https://via.placeholder.com/800x400?text=News' }}" class="card-img-top" alt="article image" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://via.placeholder.com/800x400?text=News';" />
+            <div class="card-body d-flex flex-column">
               <h4 class="card-title">
                 <a href="{{ url_for('article_detail', article_id=article.id) }}" class="text-decoration-none text-primary">
                   {{ article.title }}
@@ -15,13 +23,16 @@
               <small class="text-muted d-block mb-2">
                 by <strong>{{ article.author.username }}</strong> on {{ article.date_posted.strftime('%Y-%m-%d %H:%M') }}
               </small>
-              <p class="card-text">{{ article.content[:150] }}{% if article.content|length > 150 %}...{% endif %}</p>
+              <p class="card-text">{{ (article.summary or article.content)[:180] }}{% if (article.summary or article.content)|length > 180 %}...{% endif %}</p>
               
               {% if current_user.is_authenticated %}
               <div class="mt-auto">
                 <a href="{{ url_for('article_detail', article_id=article.id) }}" class="btn btn-primary btn-sm">
                   Read More →
                 </a>
+                {% if article.source_url %}
+                <a href="{{ article.source_url }}" target="_blank" rel="noopener" class="btn btn-outline-secondary btn-sm ms-2">Read full article</a>
+                {% endif %}
                 <button 
                   class="btn like-btn btn-sm ms-2 {% if user_reactions.get(article.id) and user_reactions[article.id].liked %}btn-success{% else %}btn-outline-primary{% endif %}" 
                   data-article-id="{{ article.id }}"

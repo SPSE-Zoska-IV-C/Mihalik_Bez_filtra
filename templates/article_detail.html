@@ -4,15 +4,20 @@
     <div class="col-lg-8 mx-auto">
       <!-- Article Card -->
       <div class="card mb-4">
+        <img src="{{ article.photo or 'https://via.placeholder.com/800x400?text=News' }}" class="card-img-top" alt="article image" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://via.placeholder.com/800x400?text=News';" />
         <div class="card-body">
           <h2 class="card-title">{{ article.title }}</h2>
           <p class="text-muted">
             by <strong>{{ article.author.username }}</strong> on {{ article.date_posted.strftime('%Y-%m-%d %H:%M') }}
           </p>
           <hr>
-          <div class="card-text">
-            {{ article.content }}
-          </div>
+          {% if article.summary %}
+          <p class="lead">{{ article.summary }}</p>
+          {% endif %}
+          <div class="card-text">{{ article.content }}</div>
+          {% if article.source_url %}
+          <a href="{{ article.source_url }}" class="btn btn-outline-secondary mt-3" target="_blank" rel="noopener">Read full article</a>
+          {% endif %}
           
           {% if current_user.is_authenticated %}
           <div class="mt-3">
