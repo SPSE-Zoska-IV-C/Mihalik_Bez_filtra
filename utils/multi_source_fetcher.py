@@ -1,390 +1,301 @@
-"""Multi-source fetcher that fuses several perspectives into key points."""
-
-import random
-import re
-from typing import Dict, List, Optional
-from urllib.parse import urlparse, urljoin
-
+"""
+Multi-source news fetcher that aggregates articles from multiple sources
+about the same topic, similar to Ground News.
+"""
+import feedparser
 import requests
 from bs4 import BeautifulSoup
-
-try:
-    import feedparser
-except ImportError:  # pragma: no cover - optional dependency
-    feedparser = None
-
-RSS_FEEDS = [
-    "http://rss.cnn.com/rss/edition.rss",
-    "http://rss.cnn.com/rss/edition_world.rss",
-    "http://rss.cnn.com/rss/edition_technology.rss",
-    "http://feeds.bbci.co.uk/news/rss.xml",
-    "http://feeds.bbci.co.uk/news/world/rss.xml",
-    "http://feeds.bbci.co.uk/news/technology/rss.xml",
-    "http://feeds.reuters.com/reuters/topNews",
-    "http://feeds.reuters.com/reuters/worldNews",
-    "http://feeds.reuters.com/reuters/technologyNews",
-    "https://rss.cbc.ca/lineup/topstories.xml",
-    "https://rss.cbc.ca/lineup/world.xml",
-    "https://rss.cbc.ca/lineup/technology.xml",
-]
-
-BIAS_DOMAINS = {
-    "left": {"cnn.com", "nytimes.com", "washingtonpost.com", "cbc.ca", "theguardian.com"},
-    "center": {"bbc.co.uk", "reuters.com", "apnews.com", "npr.org"},
-    "right": {"foxnews.com", "nypost.com", "newsmax.com", "dailycaller.com"},
-}
-
-HTTP_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-}
-
-DEFAULT_IMAGE = "https://via.placeholder.com/800x400?text=News"
+from datetime import datetime
+from typing import List, Dict, Optional
+import re
+from urllib.parse import urlparse
+import json
 
 
-def _normalize_domain(url: str) -> str:
-    try:
-        parsed = urlparse(url or "")
-        domain = parsed.netloc.lower()
-        if domain.startswith("www."):
-            domain = domain[4:]
-        return domain.split(":")[0]
-    except Exception:
-        return ""
-
-
-def _classify_bias(domain: str) -> str:
-    for bias, candidates in BIAS_DOMAINS.items():
-        if any(domain == c or domain.endswith(f".{c}") for c in candidates):
-            return bias
-    return "center"
-
-
-def _extract_keywords(text: str) -> List[str]:
-    words = re.findall(r"\b[a-z]{4,}\b", (text or "").lower())
-    stop_words = {
-        "this",
-        "that",
-        "with",
-        "from",
-        "have",
-        "been",
-        "will",
-        "news",
-        "says",
-        "could",
-        "would",
-        "should",
-        "what",
-        "when",
-        "where",
-        "which",
-        "who",
-        "there",
-        "their",
-        "these",
-        "those",
-        "about",
-        "after",
-        "before",
-    }
-    return [w for w in words if w not in stop_words][:8]
-
-
-def _parse_feed(feed_url: str, entries_per_feed: int = 12, timeout: int = 4) -> List[Dict]:
-    """Parse an RSS feed into lightweight entries."""
-    entries: List[Dict] = []
-    try:
-        if feedparser:
-            parsed = feedparser.parse(feed_url)
-            for entry in parsed.get("entries", [])[:entries_per_feed]:
-                title = getattr(entry, "title", "").strip()
-                link = getattr(entry, "link", "").strip()
-                summary = getattr(entry, "summary", "") or getattr(entry, "description", "")
-                if not title or not link:
-                    continue
-                entries.append({"title": title, "link": link, "summary": summary})
-            return entries
-
-        # Fallback simple XML parsing
-        resp = requests.get(feed_url, timeout=timeout, headers=HTTP_HEADERS)
-        if resp.status_code != 200:
-            return entries
-        soup = BeautifulSoup(resp.content, "xml")
-        for item in soup.find_all("item")[:entries_per_feed]:
-            title_node = item.find("title")
-            link_node = item.find("link")
-            if not (title_node and link_node):
+class MultiSourceNewsFetcher:
+    """Fetches news from multiple sources and groups by topic"""
+    
+    # Real RSS feeds from reputable news sources
+    RSS_FEEDS = [
+        "https://feeds.bbci.co.uk/news/rss.xml",  # BBC News
+        "https://rss.cnn.com/rss/edition.rss",  # CNN
+        "https://feeds.reuters.com/reuters/topNews",  # Reuters
+        "https://feeds.npr.org/1001/rss.xml",  # NPR
+        "https://www.theguardian.com/world/rss",  # The Guardian
+        "https://feeds.abcnews.com/abcnews/topstories",  # ABC News
+        "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",  # NY Times
+    ]
+    
+    def __init__(self):
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        })
+    
+    def fetch_all_feeds(self) -> List[Dict]:
+        """Fetch articles from all RSS feeds"""
+        all_articles = []
+        
+        for feed_url in self.RSS_FEEDS:
+            try:
+                feed = feedparser.parse(feed_url)
+                source_name = self._extract_source_name(feed_url)
+                
+                for entry in feed.entries[:10]:  # Limit per feed
+                    article = {
+                        'title': entry.get('title', ''),
+                        'link': entry.get('link', ''),
+                        'summary': entry.get('summary', '') or entry.get('description', ''),
+                        'published': entry.get('published', ''),
+                        'source': source_name,
+                        'source_url': feed_url
+                    }
+                    
+                    # Try to get image from media tags or content
+                    article['image'] = self._extract_image(entry)
+                    
+                    # Try to fetch full content
+                    if article['link']:
+                        article['content'] = self._fetch_article_content(article['link'])
+                    
+                    all_articles.append(article)
+            except Exception as e:
+                print(f"Error fetching feed {feed_url}: {e}")
                 continue
-            summary_node = item.find("description")
-            entries.append(
-                {
-                    "title": title_node.get_text(strip=True),
-                    "link": link_node.get_text(strip=True),
-                    "summary": summary_node.get_text(strip=True) if summary_node else "",
-                }
-            )
-    except Exception:
-        return entries
-    return entries
-
-
-def _collect_entries(max_feeds: int = 10, entries_per_feed: int = 12) -> List[Dict]:
-    feeds = RSS_FEEDS[:]
-    random.shuffle(feeds)
-    collected: List[Dict] = []
-    seen_links = set()
-
-    for feed_url in feeds[:max_feeds]:
-        feed_entries = _parse_feed(feed_url, entries_per_feed=entries_per_feed)
-        if not feed_entries:
-            continue
-        for entry in feed_entries:
-            link = entry.get("link")
-            title = entry.get("title")
-            if not link or not title or link in seen_links:
-                continue
-            domain = _normalize_domain(link)
-            keywords = _extract_keywords(title)
-            if not domain or len(keywords) < 2:
-                continue
-            collected.append(
-                {
-                    "title": title,
-                    "link": link,
-                    "summary": entry.get("summary", ""),
-                    "domain": domain,
-                    "keywords": keywords,
-                }
-            )
-            seen_links.add(link)
-            if len(collected) >= 120:  # safety limit
-                return collected
-    return collected
-
-
-def _sentence_split(text: str) -> List[str]:
-    sentences = re.split(r"(?<=[.!?])\s+", text or "")
-    cleaned = []
-    for sentence in sentences:
-        s = re.sub(r"\s+", " ", sentence).strip()
-        if len(s) >= 40:  # keep informative sentences only
-            cleaned.append(s)
-    return cleaned
-
-
-def _get_image_from_url(url: str, timeout: int = 4) -> Optional[str]:
-    try:
-        resp = requests.get(url, timeout=timeout, headers=HTTP_HEADERS, allow_redirects=True)
-        if resp.status_code != 200:
-            return None
-        soup = BeautifulSoup(resp.text, "html.parser")
-        for selector in [
-            ("meta", {"property": "og:image"}),
-            ("meta", {"name": "twitter:image"}),
-            ("meta", {"itemprop": "image"}),
-        ]:
-            tag = soup.find(*selector)
-            if tag and tag.get("content"):
-                candidate = tag["content"]
-                if candidate.startswith("//"):
-                    candidate = f"https:{candidate}"
-                elif candidate.startswith("/"):
-                    candidate = urljoin(resp.url, candidate)
-                if candidate.startswith("http"):
-                    return candidate
-    except Exception:
+        
+        return all_articles
+    
+    def _extract_source_name(self, feed_url: str) -> str:
+        """Extract source name from feed URL"""
+        domain = urlparse(feed_url).netloc
+        if 'bbc' in domain:
+            return 'BBC News'
+        elif 'cnn' in domain:
+            return 'CNN'
+        elif 'reuters' in domain:
+            return 'Reuters'
+        elif 'npr' in domain:
+            return 'NPR'
+        elif 'guardian' in domain:
+            return 'The Guardian'
+        elif 'abcnews' in domain:
+            return 'ABC News'
+        elif 'nytimes' in domain:
+            return 'New York Times'
+        return domain.replace('www.', '').split('.')[0].title()
+    
+    def _extract_image(self, entry) -> Optional[str]:
+        """Extract image URL from RSS entry"""
+        # Check media tags
+        if hasattr(entry, 'media_content'):
+            for media in entry.media_content:
+                if media.get('type', '').startswith('image'):
+                    return media.get('url')
+        
+        # Check media_thumbnail
+        if hasattr(entry, 'media_thumbnail'):
+            for thumb in entry.media_thumbnail:
+                return thumb.get('url')
+        
+        # Check summary/description for img tags
+        summary = entry.get('summary', '') or entry.get('description', '')
+        if summary:
+            soup = BeautifulSoup(summary, 'html.parser')
+            img = soup.find('img')
+            if img and img.get('src'):
+                return img.get('src')
+        
         return None
-    return None
-
-
-def _extract_text_from_url(url: str, timeout: int = 3) -> str:
-    try:
-        resp = requests.get(url, timeout=timeout, headers=HTTP_HEADERS, allow_redirects=True)
-        if resp.status_code != 200:
-            return ""
-        soup = BeautifulSoup(resp.text, "html.parser")
-        for tag in soup(
-            ["script", "style", "nav", "aside", "footer", "header", "button", "form", "iframe", "svg"]
-        ):
-            tag.decompose()
-        selectors = [
-            "article",
-            "[role='article']",
-            ".article-body",
-            ".story-body",
-            ".post-content",
-            ".entry-content",
-            "main",
-            ".content",
-        ]
-        texts: List[str] = []
-        for selector in selectors:
-            node = soup.select_one(selector)
-            if not node:
-                continue
-            text = node.get_text(separator=" ", strip=True)
-            text = re.sub(r"\s+", " ", text).strip()
-            if len(text) > 200:
-                texts.append(text[:1000])
-                break
-        if texts:
-            return " ".join(texts)
-        body = soup.find("body")
-        if body:
-            text = body.get_text(separator=" ", strip=True)
-            text = re.sub(r"\s+", " ", text).strip()
-            text = re.sub(r"(saved|share|follow|subscribe|newsletter).*?(\n|$)", "", text, flags=re.IGNORECASE)
-            return text[:1000]
-    except Exception:
-        return ""
-    return ""
-
-
-def _build_key_points(texts: List[str], fallbacks: List[str], max_points: int = 5) -> List[str]:
-    candidates: List[str] = []
-    for text in texts:
-        for sentence in _sentence_split(text):
-            if len(candidates) >= max_points * 2:
-                break
-            candidates.append(sentence)
-    if not candidates:
-        for snippet in fallbacks:
-            for sentence in _sentence_split(snippet):
-                candidates.append(sentence)
-                if len(candidates) >= max_points * 2:
+    
+    def _fetch_article_content(self, url: str) -> str:
+        """Fetch full article content from URL"""
+        try:
+            response = self.session.get(url, timeout=10)
+            response.raise_for_status()
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Remove script and style elements
+            for script in soup(["script", "style", "nav", "header", "footer"]):
+                script.decompose()
+            
+            # Try to find main content
+            content_selectors = [
+                'article',
+                '[role="main"]',
+                '.article-body',
+                '.content',
+                'main',
+                '.post-content'
+            ]
+            
+            content = None
+            for selector in content_selectors:
+                content = soup.select_one(selector)
+                if content:
                     break
-            if candidates:
+            
+            if not content:
+                content = soup.find('body')
+            
+            if content:
+                # Get text and clean it
+                text = content.get_text(separator=' ', strip=True)
+                # Limit length
+                return text[:2000] if len(text) > 2000 else text
+            
+            return ''
+        except Exception:
+            return ''
+    
+    def _calculate_similarity(self, title1: str, title2: str) -> float:
+        """Calculate similarity between two titles using simple word overlap"""
+        words1 = set(re.findall(r'\w+', title1.lower()))
+        words2 = set(re.findall(r'\w+', title2.lower()))
+        
+        if not words1 or not words2:
+            return 0.0
+        
+        intersection = words1.intersection(words2)
+        union = words1.union(words2)
+        
+        # Jaccard similarity
+        return len(intersection) / len(union) if union else 0.0
+    
+    def _summarize_content(self, content: str, max_length: int = 150) -> str:
+        """Create a simple summary from content"""
+        if not content:
+            return ""
+        
+        # Remove HTML tags if present
+        soup = BeautifulSoup(content, 'html.parser')
+        content = soup.get_text()
+        
+        # Remove extra whitespace
+        content = ' '.join(content.split())
+        
+        # If content is short enough, return as is
+        if len(content) <= max_length:
+            return content
+        
+        # Try to find a good sentence break
+        sentences = re.split(r'[.!?]\s+', content)
+        summary = ""
+        
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            if len(summary) + len(sentence) + 2 <= max_length:
+                summary += sentence + ". "
+            else:
                 break
-    seen = set()
-    key_points: List[str] = []
-    for sentence in candidates:
-        normalized = sentence.lower()
-        if normalized in seen:
-            continue
-        seen.add(normalized)
-        key_points.append(sentence)
-        if len(key_points) >= max_points:
-            break
-    return key_points
-
-
-def _select_source_cluster(entries: List[Dict], min_sources: int = 2, max_sources: int = 5) -> Optional[List[Dict]]:
-    if not entries:
-        return None
-    shuffled = entries[:]
-    random.shuffle(shuffled)
-    for seed in shuffled:
-        cluster = [seed]
-        used_domains = {seed["domain"]}
-        seed_keywords = set(seed["keywords"])
-        seed_title = seed["title"].lower()
-        for candidate in entries:
-            if candidate is seed:
+        
+        # If no good break found, just truncate at word boundary
+        if not summary or len(summary) < 20:
+            words = content[:max_length].split()
+            summary = ' '.join(words[:-1]) + "..." if len(words) > 1 else content[:max_length] + "..."
+        
+        return summary.strip()
+    
+    def group_by_topic(self, articles: List[Dict], similarity_threshold: float = 0.3) -> List[List[Dict]]:
+        """Group articles by topic similarity"""
+        groups = []
+        used = set()
+        
+        for i, article1 in enumerate(articles):
+            if i in used:
                 continue
-            if candidate["domain"] in used_domains:
+            
+            group = [article1]
+            used.add(i)
+            
+            for j, article2 in enumerate(articles[i+1:], start=i+1):
+                if j in used:
+                    continue
+                
+                similarity = self._calculate_similarity(article1['title'], article2['title'])
+                if similarity >= similarity_threshold:
+                    group.append(article2)
+                    used.add(j)
+            
+            if len(group) >= 2:  # Only return groups with at least 2 sources
+                groups.append(group)
+        
+        return groups
+    
+    def fetch_multi_source_article(self) -> Optional[Dict]:
+        """Fetch and group articles from multiple sources about the same topic"""
+        print("Fetching articles from multiple sources...")
+        all_articles = self.fetch_all_feeds()
+        
+        if not all_articles:
+            print("No articles fetched from any feed")
+            return None
+        
+        print(f"Found {len(all_articles)} articles, grouping by topic...")
+        groups = self.group_by_topic(all_articles, similarity_threshold=0.25)
+        
+        if not groups:
+            print("No groups found with multiple sources")
+            return None
+        
+        # Get the largest group (most sources covering the same story)
+        largest_group = max(groups, key=len)
+        
+        if len(largest_group) < 2:
+            print(f"Largest group only has {len(largest_group)} source(s)")
+            return None
+        
+        print(f"Found story covered by {len(largest_group)} sources")
+        
+        # Create aggregated article
+        main_article = largest_group[0]
+        
+        # Collect summaries from all sources
+        source_summaries = []
+        images = []
+        seen_sources = set()  # Avoid duplicate sources
+        
+        for article in largest_group:
+            source_name = article.get('source', 'Unknown')
+            # Skip if we already have this source
+            if source_name in seen_sources:
                 continue
-            if candidate["link"] == seed["link"]:
-                continue
-            candidate_keywords = set(candidate["keywords"])
-            overlap = seed_keywords & candidate_keywords
-            title_overlap = (
-                seed_title in candidate["title"].lower() or candidate["title"].lower() in seed_title
-            )
-            if len(overlap) >= 2 or title_overlap:
-                cluster.append(candidate)
-                used_domains.add(candidate["domain"])
-            if len(cluster) >= max_sources:
-                break
-        if len(cluster) >= min_sources:
-            return cluster
-    return None
-
-
-def _prepare_sources(cluster: List[Dict]) -> List[Dict]:
-    prepared: List[Dict] = []
-    for src in cluster:
-        url = src["link"]
-        domain = src["domain"]
-        bias = _classify_bias(domain)
-        raw_text = _extract_text_from_url(url)
-        if not raw_text:
-            cleaned_summary = BeautifulSoup(src.get("summary", ""), "html.parser").get_text(
-                separator=" ", strip=True
-            )
-            raw_text = re.sub(r"\s+", " ", cleaned_summary).strip()
-        prepared.append(
-            {
-                "url": url,
-                "title": src.get("title"),
-                "summary": src.get("summary", ""),
-                "domain": domain,
-                "bias": bias,
-                "text": raw_text or "",
-            }
-        )
-    return prepared
-
-
-def fetch_multi_source_article(min_sources: int = 2) -> Optional[Dict]:
-    """Provide a synthesized article built from multiple real sources."""
-    entries = _collect_entries(max_feeds=10, entries_per_feed=12)
-    cluster = _select_source_cluster(entries, min_sources=min_sources)
-    if not cluster:
-        return None
-
-    prepared_sources = _prepare_sources(cluster)
-    texts = [src["text"] for src in prepared_sources if src["text"]]
-    fallback_summaries = [src.get("summary", "") for src in prepared_sources if src.get("summary")]
-
-    key_points = _build_key_points(texts, fallback_summaries)
-
-    if not key_points:
-        # If we still failed to build points, skip this cluster
-        return None
-
-    overview_text = " ".join(texts) if texts else " ".join(fallback_summaries)
-    overview_text = re.sub(r"\s+", " ", overview_text).strip()[:1400]
-
-    summary_preview = " | ".join(key_points[:2]) if key_points else overview_text[:200]
-    content = "Key Points:\n" + "\n".join(f"- {point}" for point in key_points)
-    if overview_text:
-        content += "\n\nCombined Overview:\n" + overview_text
-
-    photo = None
-    for src in prepared_sources[:3]:
-        photo = _get_image_from_url(src["url"])
-        if photo:
-            break
-    if not photo:
-        photo = DEFAULT_IMAGE
-
-    coverage = {"left": 0, "center": 0, "right": 0}
-    for src in prepared_sources:
-        coverage[src["bias"]] = coverage.get(src["bias"], 0) + 1
-
-    primary_source = prepared_sources[0]
-
-    return {
-        "title": primary_source.get("title", "Untitled article"),
-        "summary": summary_preview[:240],
-        "content": content,
-        "link": primary_source.get("url"),
-        "photo": photo,
-        "key_points": key_points,
-        "overview": overview_text,
-        "sources": [
-            {
-                "url": src["url"],
-                "title": src["title"],
-                "summary": src["summary"],
-                "domain": src["domain"],
-                "bias": src["bias"],
-            }
-            for src in prepared_sources
-        ],
-        "coverage_left": coverage["left"],
-        "coverage_center": coverage["center"],
-        "coverage_right": coverage["right"],
-    }
+            seen_sources.add(source_name)
+            
+            summary = article.get('summary', '') or article.get('content', '')
+            if summary:
+                summarized = self._summarize_content(summary, max_length=150)
+                if summarized:  # Only add if we have a summary
+                    source_summaries.append({
+                        'source': source_name,
+                        'summary': summarized,
+                        'url': article.get('link', '')
+                    })
+            
+            if article.get('image'):
+                images.append(article['image'])
+        
+        # Need at least 2 sources with summaries
+        if len(source_summaries) < 2:
+            print(f"Only {len(source_summaries)} sources with valid summaries")
+            return None
+        
+        # Use first available image
+        main_image = images[0] if images else None
+        
+        # Use the title from the main article
+        title = main_article.get('title', 'Breaking News')
+        if not title or len(title.strip()) < 10:
+            title = f"News Story from {len(source_summaries)} Sources"
+        
+        return {
+            'title': title,
+            'content': json.dumps(source_summaries),  # Store as JSON
+            'summary': f"Coverage from {len(source_summaries)} sources",
+            'photo': main_image,
+            'source_url': main_article.get('link', ''),
+            'sources': source_summaries,
+            'source_count': len(source_summaries)
+        }
 

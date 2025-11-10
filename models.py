@@ -36,6 +36,17 @@ class Article(db.Model):
     
     reactions = db.relationship("ArticleReaction", backref="article", lazy=True, cascade="all, delete-orphan")
     comments = db.relationship("Comment", back_populates="article", lazy=True, cascade="all, delete-orphan")
+    
+    def get_sources(self):
+        """Parse sources from content JSON if it's a multi-source article"""
+        import json
+        try:
+            sources = json.loads(self.content)
+            if isinstance(sources, list) and all(isinstance(s, dict) and 'source' in s for s in sources):
+                return sources
+        except (json.JSONDecodeError, TypeError):
+            pass
+        return None
 
 
 class ArticleReaction(db.Model):

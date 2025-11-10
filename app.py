@@ -99,39 +99,37 @@ def list_articles():
 @app.post("/fetch_article")
 @login_required
 def fetch_article():
-    rss_fetcher = None
+    multi_source_fetcher = None
     try:
-        import utils.rss_fetcher as rss_fetcher  # type: ignore
-    except Exception:
-        rss_fetcher = None
+        from utils.multi_source_fetcher import MultiSourceNewsFetcher
+        multi_source_fetcher = MultiSourceNewsFetcher()
+    except Exception as e:
+        print(f"Error importing multi_source_fetcher: {e}")
+        multi_source_fetcher = None
 
     data = None
-    if rss_fetcher:
+    if multi_source_fetcher:
         try:
-            data = rss_fetcher.fetch_random_article()
-        except RuntimeError:
-            data = rss_fetcher.fetch_random_article_basic()
-        except Exception:
-            data = rss_fetcher.fetch_random_article_basic()
-
-        if not data:
-            data = rss_fetcher.fetch_random_article_basic()
+            data = multi_source_fetcher.fetch_multi_source_article()
+        except Exception as e:
+            print(f"Error fetching multi-source article: {e}")
+            data = None
 
     if not data:
         flash("Could not fetch an article right now. Please try again shortly.", "warning")
         return redirect(url_for("list_articles"))
 
-    # Check duplicate by title or link
+    # Check duplicate by title or source_url
     existing = Article.query.filter(
-        (Article.title == data['title']) | (Article.source_url == data['link'])
+        (Article.title == data['title']) | (Article.source_url == data.get('source_url'))
     ).first()
     if not existing:
         article = Article(
             title=data['title'],
-            content=(data.get('content') or data.get('summary') or ''),
-            summary=(data.get('summary') or ''),
+            content=data['content'],  # JSON string with sources
+            summary=data.get('summary', ''),
             photo=(data.get('photo') or None),
-            source_url=data.get('link'),
+            source_url=data.get('source_url'),
             ai_generated=False,
             author=current_user,
             date_posted=datetime.utcnow(),

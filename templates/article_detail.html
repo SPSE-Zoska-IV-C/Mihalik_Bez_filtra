@@ -15,9 +15,41 @@
           <p class="lead text-muted">{{ article.summary }}</p>
           <hr>
           {% endif %}
+          
+          {% set sources = article.get_sources() %}
+          {% if sources %}
+          <!-- Multi-source bullet board -->
+          <div class="multi-source-content mb-4">
+            <h5 class="mb-3">
+              <span class="badge bg-info me-2">{{ sources|length }} Sources</span>
+              Coverage from multiple news sources:
+            </h5>
+            <ul class="list-group">
+              {% for source in sources %}
+              <li class="list-group-item mb-2">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div class="flex-grow-1">
+                    <h6 class="mb-2">
+                      <span class="badge bg-secondary me-2">{{ source.source }}</span>
+                    </h6>
+                    <p class="mb-2">{{ source.summary }}</p>
+                  </div>
+                </div>
+                {% if source.url %}
+                <a href="{{ source.url }}" class="btn btn-sm btn-outline-primary mt-2" target="_blank" rel="noopener">
+                  Read full article from {{ source.source }} →
+                </a>
+                {% endif %}
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          {% else %}
+          <!-- Single source or regular content -->
           <div class="card-text" style="white-space: pre-wrap; line-height: 1.6;">{{ article.content }}</div>
           {% if article.source_url %}
           <a href="{{ article.source_url }}" class="btn btn-outline-secondary mt-3" target="_blank" rel="noopener">Read full article</a>
+          {% endif %}
           {% endif %}
           
           {% if current_user.is_authenticated %}
