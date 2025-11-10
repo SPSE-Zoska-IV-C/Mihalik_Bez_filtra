@@ -23,7 +23,20 @@
               <small class="text-muted d-block mb-2">
                 by <strong>{{ article.author.username }}</strong> on {{ article.date_posted.strftime('%Y-%m-%d %H:%M') }}
               </small>
-              <p class="card-text">{{ article.summary or (article.content[:180] + '...' if article.content|length > 180 else article.content) }}</p>
+              <p class="card-text">
+                {% if article.summary %}
+                  {{ article.summary }}
+                {% else %}
+                  {% set sources_data = article.get_sources() %}
+                  {% if sources_data and 'bullets' in sources_data %}
+                    Key points from {{ sources_data.sources|length }} sources
+                  {% elif sources_data %}
+                    Coverage from {{ sources_data|length }} sources
+                  {% else %}
+                    {{ article.content[:180] + '...' if article.content|length > 180 else article.content }}
+                  {% endif %}
+                {% endif %}
+              </p>
               
               {% if current_user.is_authenticated %}
               <div class="mt-auto">

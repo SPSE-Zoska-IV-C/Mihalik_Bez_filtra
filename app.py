@@ -105,45 +105,71 @@ def fetch_article():
         multi_source_fetcher = MultiSourceNewsFetcher()
     except Exception as e:
         print(f"Error importing multi_source_fetcher: {e}")
+        import traceback
+        traceback.print_exc()
         multi_source_fetcher = None
 
+    # Get list of existing article titles to avoid fetching the same story
+    existing_titles = [a.title for a in Article.query.with_entities(Article.title).all()]
+    
     data = None
     if multi_source_fetcher:
         try:
-            data = multi_source_fetcher.fetch_multi_source_article()
+            data = multi_source_fetcher.fetch_multi_source_article(exclude_titles=existing_titles)
+            print(f"Fetched data: {data.get('title') if data else 'None'}")
         except Exception as e:
             print(f"Error fetching multi-source article: {e}")
+            import traceback
+            traceback.print_exc()
             data = None
 
     if not data:
         flash("Could not fetch an article right now. Please try again shortly.", "warning")
         return redirect(url_for("list_articles"))
 
-    # Check duplicate by title or source_url
-    existing = Article.query.filter(
-        (Article.title == data['title']) | (Article.source_url == data.get('source_url'))
-    ).first()
+    # Check for duplicate by title only
+    existing = Article.query.filter(Article.title == data['title']).first()
+    
     if not existing:
-        article = Article(
-            title=data['title'],
-            content=data['content'],  # JSON string with sources
-            summary=data.get('summary', ''),
-            photo=(data.get('photo') or None),
-            source_url=data.get('source_url'),
-            ai_generated=False,
-            author=current_user,
-            date_posted=datetime.utcnow(),
-        )
-        db.session.add(article)
-        db.session.commit()
+        try:
+            # Ensure title and summary are not too long
+            title = data['title'][:200] if len(data['title']) > 200 else data['title']
+            summary = data.get('summary', '')[:500] if len(data.get('summary', '')) > 500 else data.get('summary', '')
+            source_url = data.get('source_url', '')[:500] if len(data.get('source_url', '')) > 500 else data.get('source_url', '')
+            photo = (data.get('photo') or None)
+            if photo and len(photo) > 500:
+                photo = photo[:500]
+            
+            article = Article(
+                title=title,
+                content=data['content'],  # JSON string with sources
+                summary=summary,
+                photo=photo,
+                source_url=source_url,
+                ai_generated=False,
+                author=current_user,
+                date_posted=datetime.utcnow(),
+            )
+            db.session.add(article)
+            db.session.commit()
+            print(f"Article saved: {article.id} - {article.title}")
+            flash(f"Article '{article.title}' fetched successfully!", "success")
 
-        # Keep only latest 50 articles
-        ids = [a.id for a in Article.query.order_by(Article.date_posted.desc()).all()]
-        if len(ids) > 50:
-            to_delete = ids[50:]
-            if to_delete:
-                Article.query.filter(Article.id.in_(to_delete)).delete(synchronize_session=False)
-                db.session.commit()
+            # Keep only latest 50 articles
+            ids = [a.id for a in Article.query.order_by(Article.date_posted.desc()).all()]
+            if len(ids) > 50:
+                to_delete = ids[50:]
+                if to_delete:
+                    Article.query.filter(Article.id.in_(to_delete)).delete(synchronize_session=False)
+                    db.session.commit()
+        except Exception as e:
+            print(f"Error saving article: {e}")
+            import traceback
+            traceback.print_exc()
+            db.session.rollback()
+            flash("Error saving article. Please try again.", "danger")
+    else:
+        flash("This article already exists.", "info")
 
     return redirect(url_for("list_articles"))
 

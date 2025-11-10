@@ -41,9 +41,13 @@ class Article(db.Model):
         """Parse sources from content JSON if it's a multi-source article"""
         import json
         try:
-            sources = json.loads(self.content)
-            if isinstance(sources, list) and all(isinstance(s, dict) and 'source' in s for s in sources):
-                return sources
+            data = json.loads(self.content)
+            # Check if it's the new format with bullets
+            if isinstance(data, dict) and 'bullets' in data:
+                return data
+            # Check if it's the old format with source summaries
+            elif isinstance(data, list) and all(isinstance(s, dict) and 'source' in s for s in data):
+                return data
         except (json.JSONDecodeError, TypeError):
             pass
         return None

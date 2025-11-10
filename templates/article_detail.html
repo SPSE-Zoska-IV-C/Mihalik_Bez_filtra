@@ -16,34 +16,61 @@
           <hr>
           {% endif %}
           
-          {% set sources = article.get_sources() %}
-          {% if sources %}
-          <!-- Multi-source bullet board -->
-          <div class="multi-source-content mb-4">
-            <h5 class="mb-3">
-              <span class="badge bg-info me-2">{{ sources|length }} Sources</span>
-              Coverage from multiple news sources:
-            </h5>
-            <ul class="list-group">
-              {% for source in sources %}
-              <li class="list-group-item mb-2">
-                <div class="d-flex justify-content-between align-items-start">
-                  <div class="flex-grow-1">
-                    <h6 class="mb-2">
-                      <span class="badge bg-secondary me-2">{{ source.source }}</span>
-                    </h6>
-                    <p class="mb-2">{{ source.summary }}</p>
-                  </div>
+          {% set sources_data = article.get_sources() %}
+          {% if sources_data %}
+            {% if 'bullets' in sources_data %}
+            <!-- Multi-source bullet board (new format) -->
+            <div class="multi-source-content mb-4">
+              <h5 class="mb-3">
+                <span class="badge bg-info me-2">{{ sources_data.sources|length }} Sources</span>
+                Key points from multiple news sources:
+              </h5>
+              <ul class="list-group">
+                {% for bullet in sources_data.bullets %}
+                <li class="list-group-item">
+                  <p class="mb-0">{{ bullet }}</p>
+                </li>
+                {% endfor %}
+              </ul>
+              <div class="mt-3">
+                <h6>Sources:</h6>
+                <div class="d-flex flex-wrap gap-2">
+                  {% for source in sources_data.sources %}
+                  <a href="{{ source.url }}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener">
+                    {{ source.source }}
+                  </a>
+                  {% endfor %}
                 </div>
-                {% if source.url %}
-                <a href="{{ source.url }}" class="btn btn-sm btn-outline-primary mt-2" target="_blank" rel="noopener">
-                  Read full article from {{ source.source }} →
-                </a>
-                {% endif %}
-              </li>
-              {% endfor %}
-            </ul>
-          </div>
+              </div>
+            </div>
+            {% else %}
+            <!-- Multi-source bullet board (old format - fallback) -->
+            <div class="multi-source-content mb-4">
+              <h5 class="mb-3">
+                <span class="badge bg-info me-2">{{ sources_data|length }} Sources</span>
+                Coverage from multiple news sources:
+              </h5>
+              <ul class="list-group">
+                {% for source in sources_data %}
+                <li class="list-group-item mb-2">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                      <h6 class="mb-2">
+                        <span class="badge bg-secondary me-2">{{ source.source }}</span>
+                      </h6>
+                      <p class="mb-2">{{ source.summary }}</p>
+                    </div>
+                  </div>
+                  {% if source.url %}
+                  <a href="{{ source.url }}" class="btn btn-sm btn-outline-primary mt-2" target="_blank" rel="noopener">
+                    Read full article from {{ source.source }} →
+                  </a>
+                  {% endif %}
+                </li>
+                {% endfor %}
+              </ul>
+            </div>
+            {% endif %}
           {% else %}
           <!-- Single source or regular content -->
           <div class="card-text" style="white-space: pre-wrap; line-height: 1.6;">{{ article.content }}</div>
