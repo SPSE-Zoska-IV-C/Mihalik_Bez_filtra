@@ -35,7 +35,7 @@ class Article(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     
     reactions = db.relationship("ArticleReaction", backref="article", lazy=True, cascade="all, delete-orphan")
-    user_comments = db.relationship("Comment", backref="article_comments", lazy=True, cascade="all, delete-orphan")
+    comments = db.relationship("Comment", back_populates="article", lazy=True, cascade="all, delete-orphan")
 
 
 class ArticleReaction(db.Model):
@@ -56,5 +56,5 @@ class Comment(db.Model):
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     
     # Relationship to Article and User
-    article = db.relationship("Article", backref="comments", lazy=True)
+    article = db.relationship("Article", back_populates="comments", lazy=True)
     author = db.relationship("User", backref="comments", lazy=True)

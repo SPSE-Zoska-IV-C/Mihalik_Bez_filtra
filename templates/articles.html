@@ -23,7 +23,7 @@
               <small class="text-muted d-block mb-2">
                 by <strong>{{ article.author.username }}</strong> on {{ article.date_posted.strftime('%Y-%m-%d %H:%M') }}
               </small>
-              <p class="card-text">{{ (article.summary or article.content)[:180] }}{% if (article.summary or article.content)|length > 180 %}...{% endif %}</p>
+              <p class="card-text">{{ article.summary or (article.content[:180] + '...' if article.content|length > 180 else article.content) }}</p>
               
               {% if current_user.is_authenticated %}
               <div class="mt-auto">

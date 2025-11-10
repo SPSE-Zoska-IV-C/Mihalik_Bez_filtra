@@ -12,9 +12,10 @@
           </p>
           <hr>
           {% if article.summary %}
-          <p class="lead">{{ article.summary }}</p>
+          <p class="lead text-muted">{{ article.summary }}</p>
+          <hr>
           {% endif %}
-          <div class="card-text">{{ article.content }}</div>
+          <div class="card-text" style="white-space: pre-wrap; line-height: 1.6;">{{ article.content }}</div>
           {% if article.source_url %}
           <a href="{{ article.source_url }}" class="btn btn-outline-secondary mt-3" target="_blank" rel="noopener">Read full article</a>
           {% endif %}

@@ -6,9 +6,6 @@ from models import Article, User, ArticleReaction, Comment
 from routes.auth import auth_bp
 from routes.articles import articles_bp
 import os
-import random
-from xml.etree import ElementTree as ET
-
 app = Flask(__name__)
 
 instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
@@ -59,7 +56,7 @@ with app.app_context():
         ).first()
         if not result:
             _upgrade()
-            # After creating schema on a fresh DB, ensure columns exist too
+            # After creating schema on a fresh DB, ensure colum-ns exist too
             _ensure_article_columns()
         else:
             _ensure_article_columns()
@@ -102,66 +99,26 @@ def list_articles():
 @app.post("/fetch_article")
 @login_required
 def fetch_article():
+    rss_fetcher = None
     try:
-        from utils.rss_fetcher import fetch_random_article
+        import utils.rss_fetcher as rss_fetcher  # type: ignore
     except Exception:
-        # Fallback: parse RSS with stdlib + requests (no external deps)
-        def fallback_fetch_random_article():
-            import requests
-            feeds = [
-                "http://rss.cnn.com/rss/edition.rss",
-                "http://rss.cnn.com/rss/edition_world.rss",
-                "http://rss.cnn.com/rss/edition_technology.rss",
-            ]
-            try:
-                feed_url = random.choice(feeds)
-                resp = requests.get(feed_url, timeout=8)
-                if resp.status_code != 200:
-                    return None
-                root = ET.fromstring(resp.content)
-                items = root.findall('.//item')
-                if not items:
-                    return None
-                item = random.choice(items)
-                def _text(tag):
-                    el = item.find(tag)
-                    return el.text.strip() if el is not None and el.text else ''
-                title = _text('title')
-                link = _text('link')
-                description = _text('description')
-                published = _text('pubDate')
-                photo = None
-                # Try to extract og:image if BeautifulSoup is available
-                try:
-                    from bs4 import BeautifulSoup  # type: ignore
-                    if link:
-                        page = requests.get(link, timeout=8, headers={"User-Agent": "Mozilla/5.0"})
-                        if page.status_code == 200:
-                            soup = BeautifulSoup(page.text, 'html.parser')
-                            og = soup.find('meta', property='og:image')
-                            if og and og.get('content'):
-                                photo = og['content']
-                except Exception:
-                    pass
-                if not photo:
-                    photo = "https://via.placeholder.com/800x400?text=News"
-                if not title or not link:
-                    return None
-                return {
-                    'title': title,
-                    'summary': description,
-                    'link': link,
-                    'published': published,
-                    'photo': photo,
-                }
-            except Exception:
-                return None
+        rss_fetcher = None
 
-        fetch_random_article = fallback_fetch_random_article
+    data = None
+    if rss_fetcher:
+        try:
+            data = rss_fetcher.fetch_random_article()
+        except RuntimeError:
+            data = rss_fetcher.fetch_random_article_basic()
+        except Exception:
+            data = rss_fetcher.fetch_random_article_basic()
 
-    data = fetch_random_article()
+        if not data:
+            data = rss_fetcher.fetch_random_article_basic()
+
     if not data:
-        flash("Could not fetch an article right now. Please try again in a moment.", "warning")
+        flash("Could not fetch an article right now. Please try again shortly.", "warning")
         return redirect(url_for("list_articles"))
 
     # Check duplicate by title or link
@@ -171,10 +128,10 @@ def fetch_article():
     if not existing:
         article = Article(
             title=data['title'],
-            content=(data['summary'] or ''),
-            summary=(data['summary'] or ''),
-            photo=(data['photo'] or None),
-            source_url=data['link'],
+            content=(data.get('content') or data.get('summary') or ''),
+            summary=(data.get('summary') or ''),
+            photo=(data.get('photo') or None),
+            source_url=data.get('link'),
             ai_generated=False,
             author=current_user,
             date_posted=datetime.utcnow(),
