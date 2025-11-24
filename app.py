@@ -48,6 +48,16 @@ with app.app_context():
             # Best-effort; ignore if migrations will handle it
             pass
 
+    def _ensure_user_columns():
+        try:
+            cols = db.session.execute(_sql_text("PRAGMA table_info('user');")).fetchall()
+            existing = {c[1] for c in cols}
+            if 'profile_image' not in existing:
+                db.session.execute(_sql_text("ALTER TABLE user ADD COLUMN profile_image VARCHAR(500)"))
+                db.session.commit()
+        except Exception:
+            pass
+
     try:
         from flask_migrate import upgrade as _upgrade
 
@@ -58,13 +68,16 @@ with app.app_context():
             _upgrade()
             # After creating schema on a fresh DB, ensure colum-ns exist too
             _ensure_article_columns()
+            _ensure_user_columns()
         else:
             _ensure_article_columns()
+            _ensure_user_columns()
     except Exception:
         try:
             from flask_migrate import upgrade as _upgrade_fallback
             _upgrade_fallback()
             _ensure_article_columns()
+            _ensure_user_columns()
         except Exception:
             db.create_all()
 

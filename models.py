@@ -1,6 +1,7 @@
 from datetime import datetime
 import hashlib
 from flask_login import UserMixin
+from flask import url_for
 from extensions import db, bcrypt, login_manager
 
 @login_manager.user_loader
@@ -14,6 +15,7 @@ class User(db.Model, UserMixin):
     password_hash = db.Column(db.String(128), nullable=False)
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     date_created = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    profile_image = db.Column(db.String(500))
 
     articles = db.relationship("Article", backref="author", lazy=True)
 
@@ -22,6 +24,15 @@ class User(db.Model, UserMixin):
 
     def check_password(self, password: str) -> bool:
         return bcrypt.check_password_hash(self.password_hash, password)
+
+    def profile_image_url(self, size: int = 128) -> str:
+        if self.profile_image:
+            if self.profile_image.startswith("http"):
+                return self.profile_image
+            return url_for("static", filename=self.profile_image)
+        seed_source = (self.email or self.username or "user").encode("utf-8", errors="ignore")
+        seed = hashlib.md5(seed_source).hexdigest()
+        return f"https://api.dicebear.com/7.x/initials/svg?seed={seed}&radius=50&scale=110&size={size}"
 
 
 class Article(db.Model):

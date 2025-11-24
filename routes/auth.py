@@ -1,7 +1,10 @@
-from flask import Blueprint, render_template, request, redirect, url_for, flash
+import os
+import uuid
+from flask import Blueprint, render_template, request, redirect, url_for, flash, current_app
 from flask_login import login_user, logout_user, login_required, current_user
+from werkzeug.utils import secure_filename
 from extensions import db
-from models import User
+from models import User, Comment
 
 
 auth_bp = Blueprint("auth", __name__, url_prefix="")
@@ -71,4 +74,50 @@ def logout():
 def settings():
     return render_template("auth/settings.html")
 
+
+@auth_bp.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    comment_count = Comment.query.filter_by(user_id=current_user.id).count()
+    if request.method == "POST":
+        remove = request.form.get("remove_image")
+        uploaded_file = request.files.get("profile_upload")
+        message = "No changes made."
+
+        def remove_old_file():
+            if current_user.profile_image and not current_user.profile_image.startswith("http"):
+                old_path = os.path.join(current_app.static_folder, current_user.profile_image)
+                if os.path.exists(old_path):
+                    try:
+                        os.remove(old_path)
+                    except OSError:
+                        pass
+
+        if remove:
+            remove_old_file()
+            current_user.profile_image = None
+            message = "Profile picture removed."
+        elif uploaded_file and uploaded_file.filename:
+            filename = secure_filename(uploaded_file.filename)
+            _, ext = os.path.splitext(filename)
+            ext = ext.lower()
+            allowed = {".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg"}
+            if ext not in allowed:
+                flash("Unsupported file type. Please upload JPG, PNG, GIF, WEBP, or SVG.", "danger")
+                return redirect(url_for("auth.profile"))
+
+            upload_dir = os.path.join(current_app.static_folder, "uploads", "avatars")
+            os.makedirs(upload_dir, exist_ok=True)
+            new_filename = f"user_{current_user.id}_{uuid.uuid4().hex}{ext}"
+            file_path = os.path.join(upload_dir, new_filename)
+            uploaded_file.save(file_path)
+
+            remove_old_file()
+            current_user.profile_image = os.path.join("uploads", "avatars", new_filename).replace("\\", "/")
+            message = "Profile picture updated."
+
+        db.session.commit()
+        flash(message, "success")
+        return redirect(url_for("auth.profile"))
+    return render_template("auth/profile.html", comment_count=comment_count)
 

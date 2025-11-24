@@ -26,10 +26,12 @@
             </button>
             {% if current_user.is_authenticated %}
               <div class="dropdown">
-                <button class="btn btn-turquoise dropdown-toggle" type="button" id="userMenuDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-                  {{ current_user.username }}
+                <button class="btn btn-turquoise dropdown-toggle d-flex align-items-center gap-2" type="button" id="userMenuDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                  <img src="{{ current_user.profile_image_url(48) }}" alt="avatar" class="rounded-circle" width="32" height="32">
+                  <span>{{ current_user.username }}</span>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenuDropdown">
+                  <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}">My Profile</a></li>
                   <li><a class="dropdown-item" href="{{ url_for('auth.settings') }}">Settings</a></li>
                   <li><hr class="dropdown-divider"></li>
                   <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">Logout</a></li>
