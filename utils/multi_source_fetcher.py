@@ -7,6 +7,7 @@ import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 from typing import List, Dict, Optional
+from collections import Counter
 import re
 from urllib.parse import urlparse
 import json
@@ -113,7 +114,7 @@ class MultiSourceNewsFetcher:
         return domain.replace('www.', '').split('.')[0].title()
     
     def _extract_image(self, entry) -> Optional[str]:
-        """Extract image URL from RSS entry"""
+        """Extract image URL from RSS entry, falling back to scraping the article page."""
         # Check media tags
         if hasattr(entry, 'media_content'):
             for media in entry.media_content:
@@ -133,6 +134,38 @@ class MultiSourceNewsFetcher:
             if img and img.get('src'):
                 return img.get('src')
         
+        # Fallback: scrape Open Graph/Twitter image from the article page
+        link = entry.get('link')
+        if link:
+            og_image = self._scrape_open_graph_image(link)
+            if og_image:
+                return og_image
+        
+        return None
+
+    def _scrape_open_graph_image(self, url: str) -> Optional[str]:
+        """Fetch the article page and return og:image/twitter:image if available."""
+        try:
+            resp = self.session.get(url, timeout=6)
+            resp.raise_for_status()
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            selectors = [
+                ('meta', {'property': 'og:image'}),
+                ('meta', {'name': 'og:image'}),
+                ('meta', {'property': 'twitter:image'}),
+                ('meta', {'name': 'twitter:image'}),
+                ('meta', {'name': 'twitter:image:src'}),
+            ]
+            for tag, attrs in selectors:
+                node = soup.find(tag, attrs=attrs)
+                if node and node.get('content'):
+                    return node['content']
+            # fallback: first <img> with reasonable size
+            img = soup.find('img')
+            if img and img.get('src'):
+                return img['src']
+        except Exception:
+            return None
         return None
     
     def _fetch_article_content(self, url: str) -> str:
@@ -233,91 +266,77 @@ class MultiSourceNewsFetcher:
         return summary.strip()
     
     def _extract_generalized_bullets(self, source_summaries: List[Dict], max_bullets: int = 5) -> List[str]:
-        """Extract generalized bullet points from all source summaries"""
+        """
+        Extract overarching bullet points that summarize key angles across sources
+        rather than attributing to a single outlet.
+        """
         if not source_summaries:
             return []
         
-        # Combine all summaries into one text
-        all_text = " ".join([s.get('summary', '') for s in source_summaries])
+        combined_texts = []
+        for source in source_summaries:
+            raw = source.get('summary', '')
+            if not raw:
+                continue
+            soup = BeautifulSoup(raw, 'html.parser')
+            cleaned = ' '.join(soup.get_text().split())
+            if cleaned:
+                combined_texts.append(cleaned)
         
-        # Remove HTML and clean
-        soup = BeautifulSoup(all_text, 'html.parser')
-        all_text = soup.get_text()
-        all_text = ' '.join(all_text.split())
+        full_text = " ".join(combined_texts)
+        if not full_text:
+            return []
         
-        # Split into sentences
-        sentences = re.split(r'[.!?]\s+', all_text)
-        sentences = [s.strip() for s in sentences if s.strip() and len(s.strip()) > 20]
-        
+        sentences = re.split(r'[.!?]\s+', full_text)
+        sentences = [s.strip() for s in sentences if 30 <= len(s.strip()) <= 200]
         if not sentences:
             return []
         
-        # Score sentences by importance (length, keywords, frequency)
+        words = re.findall(r'\b\w+\b', full_text.lower())
+        stop_words = {
+            'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'her', 'was',
+            'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may',
+            'new', 'now', 'old', 'see', 'two', 'way', 'who', 'did', 'let', 'put', 'say',
+            'she', 'too', 'use', 'from', 'into', 'that', 'with', 'have', 'this', 'they'
+        }
+        filtered_words = [w for w in words if len(w) > 3 and w not in stop_words]
+        word_freq = Counter(filtered_words)
+        
         scored_sentences = []
-        word_freq = {}
-        words = re.findall(r'\b\w+\b', all_text.lower())
-        for word in words:
-            if len(word) > 3:  # Ignore short words
-                word_freq[word] = word_freq.get(word, 0) + 1
-        
-        # Find most common words (excluding common stop words)
-        stop_words = {'the', 'and', 'for', 'are', 'but', 'not', 'you', 'all', 'can', 'her', 'was', 'one', 'our', 'out', 'day', 'get', 'has', 'him', 'his', 'how', 'its', 'may', 'new', 'now', 'old', 'see', 'two', 'way', 'who', 'boy', 'did', 'its', 'let', 'put', 'say', 'she', 'too', 'use'}
-        important_words = {w: f for w, f in word_freq.items() if w not in stop_words and f > 1}
-        
         for sentence in sentences:
+            lower = sentence.lower()
             score = 0
-            sentence_lower = sentence.lower()
-            
-            # Score by length (prefer medium-length sentences)
-            if 30 <= len(sentence) <= 150:
+            if any(char.isdigit() for char in sentence):
                 score += 2
-            
-            # Score by containing important words
-            for word, freq in important_words.items():
-                if word in sentence_lower:
-                    score += freq
-            
-            # Prefer sentences with numbers, dates, or specific entities
-            if re.search(r'\d+', sentence):
+            if 60 <= len(sentence) <= 160:
                 score += 1
-            
+            for word, freq in word_freq.items():
+                if word in lower:
+                    score += freq
             scored_sentences.append((score, sentence))
         
-        # Sort by score and get top sentences
         scored_sentences.sort(reverse=True, key=lambda x: x[0])
-        top_sentences = [s[1] for s in scored_sentences[:max_bullets * 2]]  # Get more than needed
         
-        # Remove duplicates and similar sentences
-        unique_bullets = []
-        seen_words = []  # Use list instead of set to store sets
-        
-        for sentence in top_sentences:
-            # Check if too similar to existing bullets
-            sentence_words = set(re.findall(r'\b\w+\b', sentence.lower()))
-            is_duplicate = False
-            
-            for existing_words in seen_words:
-                overlap = len(sentence_words.intersection(existing_words))
-                if overlap > len(sentence_words) * 0.6:  # More than 60% overlap
-                    is_duplicate = True
+        bullets: List[str] = []
+        seen_word_sets: List[set] = []
+        for _, sentence in scored_sentences:
+            words_set = set(re.findall(r'\b\w+\b', sentence.lower()))
+            if not words_set:
+                continue
+            duplicate = False
+            for seen in seen_word_sets:
+                overlap = len(words_set & seen)
+                if overlap / (max(len(words_set), len(seen)) or 1) >= 0.55:
+                    duplicate = True
                     break
-            
-            if not is_duplicate:
-                unique_bullets.append(sentence)
-                seen_words.append(sentence_words)  # Use list append instead of set add
-                
-                if len(unique_bullets) >= max_bullets:
-                    break
+            if duplicate:
+                continue
+            bullets.append(sentence)
+            seen_word_sets.append(words_set)
+            if len(bullets) >= max_bullets:
+                break
         
-        # Ensure we have at least 3 bullets if possible
-        if len(unique_bullets) < 3 and len(top_sentences) > len(unique_bullets):
-            for sentence in top_sentences:
-                if sentence not in unique_bullets:
-                    unique_bullets.append(sentence)
-                    if len(unique_bullets) >= 3:
-                        break
-        
-        return unique_bullets[:max_bullets]
+        return bullets[:max_bullets]
     
     def group_by_topic(self, articles: List[Dict], similarity_threshold: float = 0.3) -> List[List[Dict]]:
         """Group articles by topic similarity"""

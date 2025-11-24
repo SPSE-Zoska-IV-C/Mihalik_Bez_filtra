@@ -1,4 +1,5 @@
 from datetime import datetime
+import hashlib
 from flask_login import UserMixin
 from extensions import db, bcrypt, login_manager
 
@@ -37,6 +38,25 @@ class Article(db.Model):
     reactions = db.relationship("ArticleReaction", backref="article", lazy=True, cascade="all, delete-orphan")
     comments = db.relationship("Comment", back_populates="article", lazy=True, cascade="all, delete-orphan")
     
+    def _placeholder_seed(self) -> str:
+        base = (self.title or str(self.id) or "news").encode("utf-8", errors="ignore")
+        return hashlib.md5(base).hexdigest()[:16]
+
+    def placeholder_image_url(self, width: int = 800, height: int = 450) -> str:
+        seed = self._placeholder_seed()
+        return f"https://picsum.photos/seed/{seed}/{width}/{height}"
+
+    def cover_image_url(self, width: int = 800, height: int = 450) -> str:
+        """
+        Returns the stored photo if present, otherwise a deterministic placeholder.
+        """
+        if self.photo:
+            return self.photo
+        return self.placeholder_image_url(width, height)
+        base = (self.title or str(self.id) or "news").encode("utf-8", errors="ignore")
+        seed = hashlib.md5(base).hexdigest()[:16]
+        return f"https://picsum.photos/seed/{seed}/{width}/{height}"
+
     def get_sources(self):
         """Parse sources from content JSON if it's a multi-source article"""
         import json

@@ -8,7 +8,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   </head>
   <body>
-    <nav class="navbar navbar-expand-lg navbar-light navbar-turquoise border-bottom sticky-top">
+    <nav class="navbar navbar-expand-lg navbar-light navbar-turquoise sticky-top shadow-sm">
       <div class="container">
         <a class="navbar-brand fw-semibold" href="{{ url_for('list_articles') }}">Bez filtra</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
@@ -20,7 +20,10 @@
             <li class="nav-item"><a class="nav-link" href="{{ url_for('list_articles') }}">Articles</a></li>
             <li class="nav-item"><a class="nav-link" href="{{ url_for('add_article') }}">Add Article</a></li>
           </ul>
-          <div class="d-flex">
+          <div class="d-flex align-items-center gap-2">
+            <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-pressed="false">
+              <span class="theme-toggle-icon" aria-hidden="true">☀️</span>
+            </button>
             {% if current_user.is_authenticated %}
               <div class="dropdown">
                 <button class="btn btn-turquoise dropdown-toggle" type="button" id="userMenuDropdown" data-bs-toggle="dropdown" aria-expanded="false">
@@ -55,6 +58,35 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+    <script>
+      (function() {
+        const storageKey = "bf-theme";
+        const body = document.body;
+        const toggleBtn = document.getElementById("themeToggleBtn");
+        if (!toggleBtn) return;
+
+        const setTheme = (mode) => {
+          body.dataset.theme = mode === "dark" ? "dark" : "light";
+          localStorage.setItem(storageKey, body.dataset.theme);
+          toggleBtn.setAttribute("aria-pressed", body.dataset.theme === "dark");
+          const label = toggleBtn.querySelector(".theme-toggle-label");
+          const icon = toggleBtn.querySelector(".theme-toggle-icon");
+          if (body.dataset.theme === "dark") {
+            icon.textContent = "🌙";
+          } else {
+            icon.textContent = "☀️";
+          }
+        };
+
+        const savedTheme = localStorage.getItem(storageKey) || "light";
+        setTheme(savedTheme);
+
+        toggleBtn.addEventListener("click", () => {
+          const next = body.dataset.theme === "dark" ? "light" : "dark";
+          setTheme(next);
+        });
+      })();
+    </script>
   </body>
   </html>
 
