@@ -18,7 +18,7 @@
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
             <li class="nav-item"><a class="nav-link" href="{{ url_for('index') }}">Home</a></li>
             <li class="nav-item"><a class="nav-link" href="{{ url_for('list_articles') }}">Articles</a></li>
-            <li class="nav-item"><a class="nav-link" href="{{ url_for('add_article') }}">Add Article</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('map') }}">Map</a></li>
           </ul>
           <div class="d-flex align-items-center gap-2">
             <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-pressed="false">
@@ -68,12 +68,14 @@
         if (!toggleBtn) return;
 
         const setTheme = (mode) => {
-          body.dataset.theme = mode === "dark" ? "dark" : "light";
-          localStorage.setItem(storageKey, body.dataset.theme);
-          toggleBtn.setAttribute("aria-pressed", body.dataset.theme === "dark");
+          const theme = mode === "dark" ? "dark" : "light";
+          body.dataset.theme = theme;
+          document.documentElement.dataset.theme = theme;
+          localStorage.setItem(storageKey, theme);
+          toggleBtn.setAttribute("aria-pressed", theme === "dark");
           const label = toggleBtn.querySelector(".theme-toggle-label");
           const icon = toggleBtn.querySelector(".theme-toggle-icon");
-          if (body.dataset.theme === "dark") {
+          if (theme === "dark") {
             icon.textContent = "🌙";
           } else {
             icon.textContent = "☀️";

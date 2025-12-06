@@ -25,12 +25,24 @@ body[data-theme="dark"] {
 }
 
 * { box-sizing: border-box; }
+html {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  min-height: 100%;
+}
+
 html, body {
   margin: 0;
   padding: 0;
   background: var(--bg);
   color: var(--fg);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+body {
+  background: var(--bg);
+  min-height: 100vh;
 }
 
 .container {
@@ -50,7 +62,7 @@ html, body {
   font-weight: 700;
 }
 
-/* Turquoise theme utilities */
+
 .btn-turquoise {
   background-color: var(--accent) !important;
   color: #051225 !important;
@@ -189,7 +201,6 @@ input[type="text"], textarea {
   color: var(--fg);
 }
 
-/* Inputs for auth forms */
 input[type="email"], input[type="password"] {
   width: 100%;
   padding: 0.6rem 0.75rem;
@@ -230,6 +241,64 @@ body[data-theme="dark"] .theme-toggle-btn {
   object-fit: cover;
   border: 4px solid var(--card-border);
   background: #fff;
+}
+body[data-theme="dark"] .profile-avatar {
+  background: var(--card);
+}
+
+#map { 
+  height: 600px;
+  width: 100%;
+  background: var(--bg);
+}
+
+body[data-theme="dark"] #map {
+  background: var(--bg);
+}
+
+/* Ensure container and content areas have proper dark mode background */
+body[data-theme="dark"] .container {
+  background: var(--bg);
+}
+
+body[data-theme="dark"] .container.py-3 {
+  background: var(--bg);
+}
+
+/* Ensure all page content has dark background */
+html[data-theme="dark"],
+body[data-theme="dark"] {
+  background-color: var(--bg) !important;
+  background: var(--bg) !important;
+}
+
+/* Ensure html element also gets dark theme */
+html {
+  background-color: var(--bg);
+  background: var(--bg);
+}
+
+body[data-theme="dark"] .row {
+  background: transparent;
+}
+
+/* Fix for Bootstrap's default white backgrounds */
+body[data-theme="dark"] .card-body,
+body[data-theme="dark"] .card {
+  background-color: var(--card) !important;
+}
+
+/* Ensure no white backgrounds appear anywhere in dark mode */
+html[data-theme="dark"],
+html[data-theme="dark"] body {
+  background: var(--bg) !important;
+  background-color: var(--bg) !important;
+}
+
+/* Ensure html element always has theme attribute for proper styling */
+html {
+  background: var(--bg);
+  background-color: var(--bg);
 }
 
 

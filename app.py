@@ -85,6 +85,9 @@ with app.app_context():
 def index():
     return redirect(url_for("list_articles"))
 
+@app.get("/map")
+def map():
+    return render_template("map.html")
 
 @app.get("/articles")
 def list_articles():

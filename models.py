@@ -73,10 +73,8 @@ class Article(db.Model):
         import json
         try:
             data = json.loads(self.content)
-            # Check if it's the new format with bullets
             if isinstance(data, dict) and 'bullets' in data:
                 return data
-            # Check if it's the old format with source summaries
             elif isinstance(data, list) and all(isinstance(s, dict) and 'source' in s for s in data):
                 return data
         except (json.JSONDecodeError, TypeError):
@@ -101,6 +99,5 @@ class Comment(db.Model):
     content = db.Column(db.Text, nullable=False)
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     
-    # Relationship to Article and User
     article = db.relationship("Article", back_populates="comments", lazy=True)
     author = db.relationship("User", backref="comments", lazy=True)
