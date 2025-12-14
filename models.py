@@ -12,7 +12,8 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
+    password_hash = db.Column(db.String(128), nullable=True)  # Nullable for OAuth users
+    google_id = db.Column(db.String(255), unique=True, nullable=True)  # Google OAuth ID
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     date_created = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     profile_image = db.Column(db.String(500))
@@ -23,7 +24,74 @@ class User(db.Model, UserMixin):
         self.password_hash = bcrypt.generate_password_hash(password).decode("utf-8")
 
     def check_password(self, password: str) -> bool:
+        if not self.password_hash:
+            return False
         return bcrypt.check_password_hash(self.password_hash, password)
+    
+    @staticmethod
+    def create_google_user(google_id: str, email: str, name: str, picture: str = None):
+        """Create or get user from Google OAuth"""
+        try:
+            # First, try to find user by google_id
+            user = User.query.filter_by(google_id=google_id).first()
+            
+            if user:
+                # User exists with this google_id, update profile image if needed
+                if picture and not user.profile_image:
+                    user.profile_image = picture
+                db.session.commit()
+                return user
+            
+            # Check if email already exists (user might have registered with email/password)
+            user = User.query.filter_by(email=email).first()
+            if user:
+                # Link Google account to existing user
+                # Check if google_id is already taken by another user
+                existing_google_user = User.query.filter_by(google_id=google_id).first()
+                if existing_google_user and existing_google_user.id != user.id:
+                    raise ValueError(f"Google ID {google_id} is already linked to another account")
+                
+                user.google_id = google_id
+                if picture:
+                    user.profile_image = picture
+                db.session.commit()
+                return user
+            
+            # Create new user
+            # Generate username from name
+            username = name.lower().replace(' ', '_').replace('.', '_').replace('-', '_')[:80]
+            # Remove any invalid characters
+            username = ''.join(c for c in username if c.isalnum() or c == '_')
+            if not username:
+                # Fallback to email prefix if name is invalid
+                username = email.split('@')[0].lower()[:80]
+            
+            # Ensure username is unique
+            base_username = username
+            counter = 1
+            while User.query.filter_by(username=username).first():
+                username = f"{base_username}_{counter}"[:80]
+                counter += 1
+                if counter > 1000:  # Safety limit
+                    raise ValueError("Could not generate unique username")
+            
+            user = User(
+                username=username,
+                email=email,
+                google_id=google_id,
+                password_hash=None,  # No password for OAuth users
+                profile_image=picture
+            )
+            db.session.add(user)
+            db.session.commit()
+            return user
+            
+        except Exception as e:
+            db.session.rollback()
+            print(f"Error in create_google_user: {type(e).__name__}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise
 
     def profile_image_url(self, size: int = 128) -> str:
         if self.profile_image:

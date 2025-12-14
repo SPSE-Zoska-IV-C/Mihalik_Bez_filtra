@@ -6,6 +6,11 @@ from models import Article, User, ArticleReaction, Comment
 from routes.auth import auth_bp
 from routes.articles import articles_bp
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
 app = Flask(__name__)
 
 instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
@@ -16,6 +21,10 @@ app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SECRET_KEY"] = "change-this-secret-key"
 
+# Google OAuth Configuration
+app.config["GOOGLE_CLIENT_ID"] = os.getenv("GOOGLE_CLIENT_ID", "")
+app.config["GOOGLE_CLIENT_SECRET"] = os.getenv("GOOGLE_CLIENT_SECRET", "")
+
 db.init_app(app)
 bcrypt.init_app(app)
 login_manager.init_app(app)
@@ -23,6 +32,10 @@ migrate.init_app(app, db)
 
 app.register_blueprint(auth_bp)
 app.register_blueprint(articles_bp)
+
+# Initialize OAuth
+from routes.auth import init_oauth
+init_oauth(app)
 
 with app.app_context():
     from sqlalchemy import text as _sql_text
@@ -55,8 +68,45 @@ with app.app_context():
             if 'profile_image' not in existing:
                 db.session.execute(_sql_text("ALTER TABLE user ADD COLUMN profile_image VARCHAR(500)"))
                 db.session.commit()
-        except Exception:
-            pass
+            if 'google_id' not in existing:
+                db.session.execute(_sql_text("ALTER TABLE user ADD COLUMN google_id VARCHAR(255)"))
+                db.session.commit()
+            # Make password_hash nullable for OAuth users
+            # SQLite doesn't support ALTER COLUMN, so we need to recreate table
+            password_hash_not_null = False
+            for col in cols:
+                if col[1] == 'password_hash' and col[3] == 0:  # 0 means NOT NULL
+                    password_hash_not_null = True
+                    break
+            
+            if password_hash_not_null:
+                print("Converting password_hash to nullable for OAuth support...")
+                # SQLite workaround: recreate table with nullable password_hash
+                # Use TEXT instead of VARCHAR to ensure nullable works properly
+                db.session.execute(_sql_text("""
+                    CREATE TABLE user_new (
+                        id INTEGER NOT NULL PRIMARY KEY,
+                        username VARCHAR(80) NOT NULL UNIQUE,
+                        email VARCHAR(120) NOT NULL UNIQUE,
+                        password_hash TEXT,
+                        google_id TEXT,
+                        is_admin BOOLEAN NOT NULL,
+                        date_created DATETIME NOT NULL,
+                        profile_image TEXT
+                    )
+                """))
+                db.session.execute(_sql_text("""
+                    INSERT INTO user_new (id, username, email, password_hash, google_id, is_admin, date_created, profile_image)
+                    SELECT id, username, email, password_hash, google_id, is_admin, date_created, profile_image
+                    FROM user
+                """))
+                db.session.execute(_sql_text("DROP TABLE user"))
+                db.session.execute(_sql_text("ALTER TABLE user_new RENAME TO user"))
+                db.session.commit()
+                print("password_hash is now nullable")
+        except Exception as e:
+            print(f"Error ensuring user columns: {e}")
+            db.session.rollback()
 
     try:
         from flask_migrate import upgrade as _upgrade
@@ -91,7 +141,22 @@ def map():
 
 @app.get("/articles")
 def list_articles():
+    filter_keyword = request.args.get('filter', '').lower()
+    
     articles = Article.query.order_by(Article.date_posted.desc()).all()
+    
+    # Apply filter if specified
+    if filter_keyword:
+        filtered_articles = []
+        for article in articles:
+            title_lower = article.title.lower()
+            summary_lower = (article.summary or '').lower()
+            content_lower = article.content.lower()
+            combined_text = f"{title_lower} {summary_lower} {content_lower}"
+            
+            if filter_keyword in combined_text:
+                filtered_articles.append(article)
+        articles = filtered_articles
     
     user_reactions = {}
     if current_user.is_authenticated:
@@ -109,7 +174,8 @@ def list_articles():
     return render_template("articles.html", 
                          articles=articles, 
                          user_reactions=user_reactions,
-                         article_stats=article_stats)
+                         article_stats=article_stats,
+                         current_filter=filter_keyword)
 
 
 @app.post("/fetch_article")

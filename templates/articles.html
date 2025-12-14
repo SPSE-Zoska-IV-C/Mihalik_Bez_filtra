@@ -8,6 +8,55 @@
     </form>
     {% endif %}
   </div>
+  
+  <!-- Filter Tabs -->
+  <div class="mb-4">
+    <div class="d-flex flex-wrap gap-2 align-items-center">
+      <span class="text-muted me-2">Filter by:</span>
+      <div class="btn-group flex-wrap" role="group" aria-label="Article filters">
+        <a href="{{ url_for('list_articles') }}" 
+           class="btn btn-sm {% if not current_filter %}btn-primary{% else %}btn-outline-primary{% endif %}">
+          All
+        </a>
+        <a href="{{ url_for('list_articles', filter='ukraine') }}" 
+           class="btn btn-sm {% if current_filter == 'ukraine' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+          Ukraine
+        </a>
+        <a href="{{ url_for('list_articles', filter='israel') }}" 
+           class="btn btn-sm {% if current_filter == 'israel' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+          Israel
+        </a>
+        <a href="{{ url_for('list_articles', filter='usa') }}" 
+           class="btn btn-sm {% if current_filter == 'usa' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+          USA
+        </a>
+        <a href="{{ url_for('list_articles', filter='russia') }}" 
+           class="btn btn-sm {% if current_filter == 'russia' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+          Russia
+        </a>
+        <a href="{{ url_for('list_articles', filter='china') }}" 
+           class="btn btn-sm {% if current_filter == 'china' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+          China
+        </a>
+        <a href="{{ url_for('list_articles', filter='palestine') }}" 
+           class="btn btn-sm {% if current_filter == 'palestine' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+          Palestine
+        </a>
+        <a href="{{ url_for('list_articles', filter='gaza') }}" 
+           class="btn btn-sm {% if current_filter == 'gaza' %}btn-primary{% else %}btn-outline-primary{% endif %}">
+          Gaza
+        </a>
+      </div>
+    </div>
+  </div>
+  
+  {% if current_filter %}
+  <div class="alert alert-info mb-3">
+    Showing articles filtered by: <strong>{{ current_filter|title }}</strong>
+    <a href="{{ url_for('list_articles') }}" class="btn btn-sm btn-outline-primary ms-2">Clear filter</a>
+  </div>
+  {% endif %}
+  
   {% if articles %}
     <div class="row">
       {% for article in articles %}
