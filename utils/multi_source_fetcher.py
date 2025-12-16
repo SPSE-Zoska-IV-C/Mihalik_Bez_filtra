@@ -11,6 +11,7 @@ from collections import Counter
 import re
 from urllib.parse import urlparse
 import json
+import os
 
 
 class MultiSourceNewsFetcher:
@@ -40,11 +41,12 @@ class MultiSourceNewsFetcher:
         "https://feeds.cbsnews.com/CBSNewsMain",  # CBS News
     ]
     
-    def __init__(self):
+    def __init__(self, gemini_api_key: Optional[str] = None):
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
         })
+        self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY", "")
     
     def fetch_all_feeds(self) -> List[Dict]:
         """Fetch articles from all RSS feeds"""
@@ -265,14 +267,144 @@ class MultiSourceNewsFetcher:
         
         return summary.strip()
     
-    def _extract_generalized_bullets(self, source_summaries: List[Dict], max_bullets: int = 5) -> List[str]:
+    def _generate_bullets_with_gemini(self, source_summaries: List[Dict], title: str) -> List[str]:
+        """Generate bullet points using Gemini API"""
+        if not self.gemini_api_key:
+            print("Gemini API key not found, falling back to basic extraction")
+            return []
+        
+        try:
+            import google.generativeai as genai
+            
+            genai.configure(api_key=self.gemini_api_key)
+            
+            # Try to list available models first (for debugging)
+            try:
+                models = genai.list_models()
+                available_models = []
+                for m in models:
+                    if 'generateContent' in m.supported_generation_methods:
+                        # Extract just the model name (remove 'models/' prefix if present)
+                        model_name = m.name.replace('models/', '') if m.name.startswith('models/') else m.name
+                        available_models.append(model_name)
+                print(f"Available Gemini models: {available_models[:10]}")  # Show first 10
+                if available_models:
+                    # Use the first available model if our preferred ones don't work
+                    preferred_models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+                    for pref in preferred_models:
+                        if any(pref in m for m in available_models):
+                            print(f"Found preferred model: {pref}")
+            except Exception as list_error:
+                print(f"Could not list models: {list_error}")
+            
+            # Use the newer model names - try gemini-2.5-flash first (newest), then gemini-2.0-flash
+            # These are the models that are actually available according to the API
+            model = None
+            model_name = None
+            
+            # Try models in order of preference (newest first)
+            preferred_models = [
+                'gemini-2.5-flash',      # Newest, fastest
+                'gemini-2.0-flash',      # Stable newer version
+                'gemini-2.5-pro',        # More capable but slower
+                'gemini-1.5-flash',      # Older but might work
+                'gemini-1.5-pro',        # Older but might work
+                'gemini-pro'              # Oldest fallback
+            ]
+            
+            for model_name in preferred_models:
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    print(f"✓ Successfully initialized {model_name} model")
+                    break
+                except Exception as e:
+                    print(f"✗ Failed to initialize {model_name}: {e}")
+                    continue
+            
+            if model is None:
+                print("✗ Could not initialize any Gemini model")
+                return []
+            
+            # Prepare source content for Gemini
+            sources_text = ""
+            for i, source in enumerate(source_summaries, 1):
+                source_name = source.get('source', 'Unknown')
+                summary = source.get('summary', '')
+                # Clean HTML tags
+                soup = BeautifulSoup(summary, 'html.parser')
+                clean_summary = ' '.join(soup.get_text().split())
+                sources_text += f"\n\nSource {i} ({source_name}):\n{clean_summary}"
+            
+            prompt = f"""You are analyzing a news story covered by multiple sources. Based on the following sources, generate 5-7 comprehensive bullet points that cover different aspects of the event, similar to how Ground News presents multi-source coverage.
+
+Story Title: {title}
+
+Sources:{sources_text}
+
+Instructions:
+- Generate 5-7 bullet points that cover DIFFERENT aspects and angles of the story
+- Each bullet point should describe a different part, angle, or perspective of the event
+- Make bullet points informative, factual, and comprehensive (60-150 words each)
+- Cover different aspects such as:
+  * What happened (the core event)
+  * Who was involved and their roles
+  * When and where it occurred
+  * Consequences and implications
+  * Reactions from different parties
+  * Historical context or background
+  * Legal, political, or social implications
+- Each bullet should synthesize information from multiple sources, not just repeat one source
+- Do NOT repeat the same information in multiple bullets
+- Write in clear, journalistic style
+- Number each bullet point (1., 2., 3., etc.)
+- Focus on creating diverse, comprehensive coverage that shows different facets of the story
+
+Bullet points:"""
+            
+            response = model.generate_content(prompt)
+            bullets_text = response.text.strip()
+            
+            # Parse bullet points (they should be numbered)
+            bullets = []
+            lines = bullets_text.split('\n')
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                # Remove numbering (1., 2., etc.) and clean up
+                cleaned = re.sub(r'^\d+[\.\)]\s*', '', line)
+                if cleaned and len(cleaned) > 30:  # At least 30 characters
+                    bullets.append(cleaned)
+            
+            if bullets:
+                print(f"✓ Generated {len(bullets)} bullet points using Gemini")
+                return bullets[:7]  # Limit to 7 max
+            else:
+                print("✗ Gemini returned no valid bullet points")
+                return []
+                
+        except Exception as e:
+            print(f"✗ Error using Gemini API: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+    
+    def _extract_generalized_bullets(self, source_summaries: List[Dict], max_bullets: int = 5, title: str = "") -> List[str]:
         """
-        Extract overarching bullet points that summarize key angles across sources
-        rather than attributing to a single outlet.
+        Extract overarching bullet points that summarize key angles across sources.
+        Uses Gemini API if available, otherwise falls back to basic extraction.
         """
         if not source_summaries:
             return []
         
+        # Try Gemini first if API key is available
+        if self.gemini_api_key:
+            gemini_bullets = self._generate_bullets_with_gemini(source_summaries, title)
+            if gemini_bullets:
+                return gemini_bullets
+        
+        # Fallback to basic extraction
+        print("Using fallback bullet extraction method")
         combined_texts = []
         for source in source_summaries:
             raw = source.get('summary', '')
@@ -499,8 +631,11 @@ class MultiSourceNewsFetcher:
         # We found a valid group, now extract bullet points
         print(f"Successfully found story with {len(source_summaries)} sources")
         
-        # Extract generalized bullet points from all sources
-        bullet_points = self._extract_generalized_bullets(source_summaries, max_bullets=5)
+        # Get title for Gemini context
+        article_title = main_article.get('title', 'Breaking News')
+        
+        # Extract generalized bullet points from all sources (using Gemini if available)
+        bullet_points = self._extract_generalized_bullets(source_summaries, max_bullets=7, title=article_title)
         
         if not bullet_points or len(bullet_points) < 2:
             print("Could not extract enough bullet points")

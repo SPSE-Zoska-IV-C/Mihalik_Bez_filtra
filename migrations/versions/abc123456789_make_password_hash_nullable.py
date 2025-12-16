@@ -70,3 +70,4 @@ def downgrade():
     op.execute("DROP TABLE user")
     op.execute("ALTER TABLE user_new RENAME TO user")
 
+

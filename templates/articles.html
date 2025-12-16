@@ -50,6 +50,13 @@
     </div>
   </div>
   
+  {% if current_search %}
+  <div class="alert alert-info mb-3">
+    Showing search results for: <strong>"{{ current_search }}"</strong>
+    <a href="{{ url_for('list_articles') }}" class="btn btn-sm btn-outline-primary ms-2">Clear search</a>
+  </div>
+  {% endif %}
+  
   {% if current_filter %}
   <div class="alert alert-info mb-3">
     Showing articles filtered by: <strong>{{ current_filter|title }}</strong>

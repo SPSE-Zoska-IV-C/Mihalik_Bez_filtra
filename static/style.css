@@ -52,6 +52,40 @@ body {
   padding: 1rem;
 }
 
+/* Navbar should be full width */
+.navbar .container-fluid {
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+/* Search bar styling */
+.navbar .input-group .form-control {
+  border-radius: 0.5rem 0 0 0.5rem;
+  border-right: none;
+}
+
+.navbar .input-group .btn-outline-secondary {
+  border-radius: 0 0.5rem 0.5rem 0;
+  border-left: none;
+  background-color: var(--accent);
+  color: #051225;
+  border-color: var(--accent);
+}
+
+.navbar .input-group .btn-outline-secondary:hover {
+  background-color: var(--accent-strong);
+  border-color: var(--accent-strong);
+}
+
+body[data-theme="dark"] .navbar .input-group .btn-outline-secondary {
+  background-color: var(--accent);
+  color: #051225;
+}
+
+body[data-theme="dark"] .navbar .input-group .btn-outline-secondary:hover {
+  background-color: var(--accent-strong);
+}
+
 .btn {
   display: inline-block;
   background: var(--accent);

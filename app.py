@@ -25,6 +25,9 @@ app.config["SECRET_KEY"] = "change-this-secret-key"
 app.config["GOOGLE_CLIENT_ID"] = os.getenv("GOOGLE_CLIENT_ID", "")
 app.config["GOOGLE_CLIENT_SECRET"] = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
+# Google Gemini API Configuration
+app.config["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
+
 db.init_app(app)
 bcrypt.init_app(app)
 login_manager.init_app(app)
@@ -142,10 +145,24 @@ def map():
 @app.get("/articles")
 def list_articles():
     filter_keyword = request.args.get('filter', '').lower()
+    search_query = request.args.get('search', '').strip().lower()
     
     articles = Article.query.order_by(Article.date_posted.desc()).all()
     
-    # Apply filter if specified
+    # Apply search query if specified (from navbar search bar)
+    if search_query:
+        filtered_articles = []
+        for article in articles:
+            title_lower = article.title.lower()
+            summary_lower = (article.summary or '').lower()
+            content_lower = article.content.lower()
+            combined_text = f"{title_lower} {summary_lower} {content_lower}"
+            
+            if search_query in combined_text:
+                filtered_articles.append(article)
+        articles = filtered_articles
+    
+    # Apply filter if specified (from filter buttons)
     if filter_keyword:
         filtered_articles = []
         for article in articles:
@@ -175,7 +192,8 @@ def list_articles():
                          articles=articles, 
                          user_reactions=user_reactions,
                          article_stats=article_stats,
-                         current_filter=filter_keyword)
+                         current_filter=filter_keyword,
+                         current_search=search_query)
 
 
 @app.post("/fetch_article")
@@ -184,7 +202,8 @@ def fetch_article():
     multi_source_fetcher = None
     try:
         from utils.multi_source_fetcher import MultiSourceNewsFetcher
-        multi_source_fetcher = MultiSourceNewsFetcher()
+        gemini_key = app.config.get("GEMINI_API_KEY", "")
+        multi_source_fetcher = MultiSourceNewsFetcher(gemini_api_key=gemini_key)
     except Exception as e:
         print(f"Error importing multi_source_fetcher: {e}")
         import traceback

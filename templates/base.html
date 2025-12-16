@@ -9,7 +9,7 @@
   </head>
   <body>
     <nav class="navbar navbar-expand-lg navbar-light navbar-turquoise sticky-top shadow-sm">
-      <div class="container">
+      <div class="container-fluid px-4">
         <a class="navbar-brand fw-semibold" href="{{ url_for('list_articles') }}">Bez filtra</a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar" aria-controls="mainNavbar" aria-expanded="false" aria-label="Toggle navigation">
           <span class="navbar-toggler-icon"></span>
@@ -20,6 +20,16 @@
             <li class="nav-item"><a class="nav-link" href="{{ url_for('list_articles') }}">Articles</a></li>
             <li class="nav-item"><a class="nav-link" href="{{ url_for('map') }}">Map</a></li>
           </ul>
+          <form class="d-flex me-3" method="GET" action="{{ url_for('list_articles') }}" style="max-width: 300px; width: 100%;">
+            <div class="input-group">
+              <input class="form-control" type="search" name="search" placeholder="Search articles..." aria-label="Search" value="{{ request.args.get('search', '') }}">
+              <button class="btn btn-outline-secondary" type="submit">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                  <path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/>
+                </svg>
+              </button>
+            </div>
+          </form>
           <div class="d-flex align-items-center gap-2">
             <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-pressed="false">
               <span class="theme-toggle-icon" aria-hidden="true">☀️</span>
