@@ -1,5 +1,5 @@
-from datetime import datetime
-from flask import Flask, render_template, request, redirect, url_for, flash
+from datetime import datetime, timedelta
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from extensions import db, bcrypt, login_manager, migrate
 from models import Article, User, ArticleReaction, Comment 
@@ -8,7 +8,6 @@ from routes.articles import articles_bp
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
 load_dotenv()
 
 app = Flask(__name__)
@@ -21,11 +20,9 @@ app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SECRET_KEY"] = "change-this-secret-key"
 
-# Google OAuth Configuration
 app.config["GOOGLE_CLIENT_ID"] = os.getenv("GOOGLE_CLIENT_ID", "")
 app.config["GOOGLE_CLIENT_SECRET"] = os.getenv("GOOGLE_CLIENT_SECRET", "")
 
-# Google Gemini API Configuration
 app.config["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
 
 db.init_app(app)
@@ -36,7 +33,6 @@ migrate.init_app(app, db)
 app.register_blueprint(auth_bp)
 app.register_blueprint(articles_bp)
 
-# Initialize OAuth
 from routes.auth import init_oauth
 init_oauth(app)
 
@@ -56,12 +52,17 @@ with app.app_context():
                 alter_statements.append("ALTER TABLE article ADD COLUMN source_url VARCHAR(500)")
             if 'ai_generated' not in existing:
                 alter_statements.append("ALTER TABLE article ADD COLUMN ai_generated BOOLEAN NOT NULL DEFAULT 0")
+            if 'latitude' not in existing:
+                alter_statements.append("ALTER TABLE article ADD COLUMN latitude REAL")
+            if 'longitude' not in existing:
+                alter_statements.append("ALTER TABLE article ADD COLUMN longitude REAL")
+            if 'location_name' not in existing:
+                alter_statements.append("ALTER TABLE article ADD COLUMN location_name VARCHAR(200)")
             for stmt in alter_statements:
                 db.session.execute(_sql_text(stmt))
             if alter_statements:
                 db.session.commit()
         except Exception:
-            # Best-effort; ignore if migrations will handle it
             pass
 
     def _ensure_user_columns():
@@ -84,8 +85,6 @@ with app.app_context():
             
             if password_hash_not_null:
                 print("Converting password_hash to nullable for OAuth support...")
-                # SQLite workaround: recreate table with nullable password_hash
-                # Use TEXT instead of VARCHAR to ensure nullable works properly
                 db.session.execute(_sql_text("""
                     CREATE TABLE user_new (
                         id INTEGER NOT NULL PRIMARY KEY,
@@ -138,9 +137,160 @@ with app.app_context():
 def index():
     return redirect(url_for("list_articles"))
 
+def extract_location_with_gemini(title: str, content: str, summary: str = "") -> dict:
+    """Extract location from article using Gemini API"""
+    gemini_key = app.config.get("GEMINI_API_KEY", "")
+    if not gemini_key:
+        return {"latitude": None, "longitude": None, "location_name": None}
+    
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=gemini_key)
+        
+        # Try to find available model
+        model = None
+        for model_name in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-1.5-flash']:
+            try:
+                model = genai.GenerativeModel(model_name)
+                break
+            except:
+                continue
+        
+        if not model:
+            return {"latitude": None, "longitude": None, "location_name": None}
+        
+        # Prepare content for analysis
+        article_text = f"Title: {title}\n\n"
+        if summary:
+            article_text += f"Summary: {summary}\n\n"
+        article_text += f"Content: {content[:2000]}"  # Limit content length
+        
+        prompt = f"""Analyze this news article and determine the primary geographic location where the event occurred or is most relevant.
+
+{article_text}
+
+Instructions:
+- Identify the primary location (city, region, country) where this event took place or is most relevant
+- If multiple locations are mentioned, choose the most important one
+- If no specific location can be determined, return "null" for all fields
+- Return ONLY a JSON object in this exact format (no other text):
+{{
+  "location_name": "City, Country" or null,
+  "latitude": number or null,
+  "longitude": number or null
+}}
+
+If you cannot determine a location, return:
+{{
+  "location_name": null,
+  "latitude": null,
+  "longitude": null
+}}
+
+JSON response:"""
+        
+        response = model.generate_content(prompt)
+        response_text = response.text.strip()
+        
+        # Try to extract JSON from response
+        import json
+        import re
+        
+        # Remove markdown code blocks if present
+        response_text = re.sub(r'```json\s*', '', response_text)
+        response_text = re.sub(r'```\s*', '', response_text)
+        response_text = response_text.strip()
+        
+        try:
+            location_data = json.loads(response_text)
+            return {
+                "latitude": location_data.get("latitude"),
+                "longitude": location_data.get("longitude"),
+                "location_name": location_data.get("location_name")
+            }
+        except json.JSONDecodeError:
+            # Try to extract location name from text response
+            location_name_match = re.search(r'"location_name":\s*"([^"]+)"', response_text)
+            if location_name_match:
+                return {
+                    "latitude": None,
+                    "longitude": None,
+                    "location_name": location_name_match.group(1)
+                }
+            return {"latitude": None, "longitude": None, "location_name": None}
+            
+    except Exception as e:
+        print(f"Error extracting location with Gemini: {e}")
+        return {"latitude": None, "longitude": None, "location_name": None}
+
+
+def geocode_location(location_name: str) -> dict:
+    """Geocode location name to coordinates using Nominatim (OpenStreetMap)"""
+    if not location_name:
+        return {"latitude": None, "longitude": None}
+    
+    try:
+        import requests
+        url = "https://nominatim.openstreetmap.org/search"
+        params = {
+            "q": location_name,
+            "format": "json",
+            "limit": 1
+        }
+        headers = {
+            "User-Agent": "BezFiltraNewsApp/1.0"
+        }
+        
+        response = requests.get(url, params=params, headers=headers, timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            if data and len(data) > 0:
+                return {
+                    "latitude": float(data[0]["lat"]),
+                    "longitude": float(data[0]["lon"])
+                }
+    except Exception as e:
+        print(f"Error geocoding location: {e}")
+    
+    return {"latitude": None, "longitude": None}
+
+
 @app.get("/map")
 def map():
     return render_template("map.html")
+
+
+@app.get("/api/articles/with-location")
+def get_articles_with_location():
+    """API endpoint to get articles with location data for map (only articles from last 24 hours)"""
+    # Calculate cutoff time (24 hours ago)
+    cutoff_time = datetime.utcnow() - timedelta(hours=24)
+    
+    articles = Article.query.filter(
+        Article.latitude.isnot(None),
+        Article.longitude.isnot(None),
+        Article.date_posted >= cutoff_time
+    ).order_by(Article.date_posted.desc()).limit(100).all()
+    
+    articles_data = []
+    for article in articles:
+        sources_data = article.get_sources()
+        preview_text = article.summary or ""
+        if not preview_text and sources_data and 'bullets' in sources_data:
+            preview_text = sources_data['bullets'][0][:200] if sources_data['bullets'] else ""
+        
+        articles_data.append({
+            "id": article.id,
+            "title": article.title,
+            "latitude": article.latitude,
+            "longitude": article.longitude,
+            "location_name": article.location_name,
+            "preview": preview_text[:200] + "..." if len(preview_text) > 200 else preview_text,
+            "photo": article.cover_image_url(300, 200),
+            "date_posted": article.date_posted.strftime('%Y-%m-%d %H:%M')
+        })
+    
+    return jsonify(articles_data)
 
 @app.get("/articles")
 def list_articles():
@@ -241,6 +391,17 @@ def fetch_article():
             if photo and len(photo) > 500:
                 photo = photo[:500]
             
+            # Extract location using Gemini
+            print("Extracting location from article...")
+            location_data = extract_location_with_gemini(title, data['content'], summary)
+            
+            # If we have location name but no coordinates, try to geocode it
+            if location_data.get("location_name") and not location_data.get("latitude"):
+                print(f"Geocoding location: {location_data['location_name']}")
+                geocode_result = geocode_location(location_data["location_name"])
+                location_data["latitude"] = geocode_result.get("latitude")
+                location_data["longitude"] = geocode_result.get("longitude")
+            
             article = Article(
                 title=title,
                 content=data['content'],  # JSON string with sources
@@ -250,10 +411,15 @@ def fetch_article():
                 ai_generated=False,
                 author=current_user,
                 date_posted=datetime.utcnow(),
+                latitude=location_data.get("latitude"),
+                longitude=location_data.get("longitude"),
+                location_name=location_data.get("location_name")
             )
             db.session.add(article)
             db.session.commit()
             print(f"Article saved: {article.id} - {article.title}")
+            if location_data.get("location_name"):
+                print(f"Location: {location_data['location_name']} ({location_data.get('latitude')}, {location_data.get('longitude')})")
             flash(f"Article '{article.title}' fetched successfully!", "success")
 
             # Keep only latest 50 articles

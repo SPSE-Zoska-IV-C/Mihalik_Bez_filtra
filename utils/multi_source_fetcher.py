@@ -44,7 +44,17 @@ class MultiSourceNewsFetcher:
     def __init__(self, gemini_api_key: Optional[str] = None):
         self.session = requests.Session()
         self.session.headers.update({
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'DNT': '1',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Cache-Control': 'max-age=0'
         })
         self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY", "")
     
@@ -116,59 +126,191 @@ class MultiSourceNewsFetcher:
         return domain.replace('www.', '').split('.')[0].title()
     
     def _extract_image(self, entry) -> Optional[str]:
-        """Extract image URL from RSS entry, falling back to scraping the article page."""
-        # Check media tags
+        """
+        Extract image URL from RSS entry using a simple, reliable approach.
+        Focuses on RSS feed images which are usually reliable and decent quality.
+        """
+        article_link = entry.get('link', '')
+        images_found = []
+        
+        # Priority 1: Check media_content (usually best quality in RSS)
         if hasattr(entry, 'media_content'):
             for media in entry.media_content:
                 if media.get('type', '').startswith('image'):
-                    return media.get('url')
+                    url = media.get('url')
+                    if url:
+                        url = self._make_absolute_url(url, article_link)
+                        # Get dimensions if available
+                        width = int(media.get('width', 0) or 0)
+                        height = int(media.get('height', 0) or 0)
+                        size = width * height if width and height else 100000  # High priority
+                        images_found.append((url, size, 'media_content', width, height))
         
-        # Check media_thumbnail
+        # Priority 2: Check media_thumbnail (fallback, usually smaller)
         if hasattr(entry, 'media_thumbnail'):
             for thumb in entry.media_thumbnail:
-                return thumb.get('url')
+                url = thumb.get('url')
+                if url:
+                    url = self._make_absolute_url(url, article_link)
+                    width = int(thumb.get('width', 0) or 0)
+                    height = int(thumb.get('height', 0) or 0)
+                    size = width * height if width and height else 50000  # Medium priority
+                    images_found.append((url, size, 'thumbnail', width, height))
         
-        # Check summary/description for img tags
+        # Priority 3: Check summary/description for img tags (HTML embedded)
         summary = entry.get('summary', '') or entry.get('description', '')
         if summary:
             soup = BeautifulSoup(summary, 'html.parser')
-            img = soup.find('img')
-            if img and img.get('src'):
-                return img.get('src')
+            imgs = soup.find_all('img')
+            for img in imgs:
+                src = img.get('src') or img.get('data-src') or img.get('data-lazy-src')
+                if src:
+                    src = self._make_absolute_url(src, article_link)
+                    # Skip very small images (likely icons)
+                    width = int(img.get('width', 0) or 0)
+                    height = int(img.get('height', 0) or 0)
+                    if width > 0 and height > 0 and (width < 100 or height < 100):
+                        continue  # Skip tiny images
+                    size = width * height if width and height else 30000  # Lower priority
+                    images_found.append((src, size, 'html', width, height))
         
-        # Fallback: scrape Open Graph/Twitter image from the article page
-        link = entry.get('link')
-        if link:
-            og_image = self._scrape_open_graph_image(link)
-            if og_image:
-                return og_image
+        # Select best image: prefer media_content, then by size
+        if images_found:
+            # Sort: media_content first, then by size
+            images_found.sort(key=lambda x: (
+                x[2] == 'media_content',  # media_content preferred
+                x[2] == 'thumbnail',      # thumbnail second
+                x[1]  # then by size
+            ), reverse=True)
+            
+            best_url = images_found[0][0]
+            # Try to upgrade resolution if it's a thumbnail
+            if images_found[0][2] == 'thumbnail' or (images_found[0][3] > 0 and images_found[0][3] < 400):
+                best_url = self._upgrade_image_resolution(best_url)
+            
+            return best_url
         
         return None
+    
+    def _make_absolute_url(self, url: str, base_url: str = None) -> str:
+        """Convert relative URL to absolute URL."""
+        if not url:
+            return url
+        
+        # Already absolute
+        if url.startswith('http://') or url.startswith('https://'):
+            return url
+        
+        # Protocol-relative URL
+        if url.startswith('//'):
+            return 'https:' + url
+        
+        # Relative URL - need base URL
+        if base_url:
+            from urllib.parse import urljoin
+            return urljoin(base_url, url)
+        
+        return url
+    
+    def _upgrade_image_resolution(self, image_url: str) -> str:
+        """Try to get higher resolution version of image by removing size parameters."""
+        if not image_url:
+            return image_url
+        
+        # Common patterns to remove size restrictions
+        upgraded_url = image_url
+        
+        # Remove common size parameters from URLs
+        patterns_to_remove = [
+            r'[?&](w|width)=\d+',
+            r'[?&](h|height)=\d+',
+            r'[?&](s|size)=\d+',
+            r'[?&]resize=\d+',
+            r'[?&]scale=\d+',
+            r'[?&]quality=\d+',
+        ]
+        
+        for pattern in patterns_to_remove:
+            upgraded_url = re.sub(pattern, '', upgraded_url, flags=re.IGNORECASE)
+        
+        # For some CDNs, try to get original/full size
+        replacements = [
+            ('/thumb/', '/'),
+            ('/thumbnail/', '/'),
+            ('/small/', '/'),
+            ('/medium/', '/'),
+            ('/large/', '/'),
+            ('_thumb.', '.'),
+            ('_small.', '.'),
+            ('_medium.', '.'),
+            ('_large.', '.'),
+        ]
+        
+        for old, new in replacements:
+            if old in upgraded_url.lower():
+                upgraded_url = upgraded_url.replace(old, new, 1).replace(old.upper(), new, 1)
+                break
+        
+        # Clean up double slashes and trailing query separators
+        upgraded_url = re.sub(r'[?&]+', '&', upgraded_url)
+        upgraded_url = upgraded_url.rstrip('&?')
+        if upgraded_url.endswith('&'):
+            upgraded_url = upgraded_url[:-1]
+        
+        return upgraded_url
 
-    def _scrape_open_graph_image(self, url: str) -> Optional[str]:
-        """Fetch the article page and return og:image/twitter:image if available."""
-        try:
-            resp = self.session.get(url, timeout=6)
-            resp.raise_for_status()
-            soup = BeautifulSoup(resp.text, 'html.parser')
-            selectors = [
-                ('meta', {'property': 'og:image'}),
-                ('meta', {'name': 'og:image'}),
-                ('meta', {'property': 'twitter:image'}),
-                ('meta', {'name': 'twitter:image'}),
-                ('meta', {'name': 'twitter:image:src'}),
-            ]
-            for tag, attrs in selectors:
-                node = soup.find(tag, attrs=attrs)
-                if node and node.get('content'):
-                    return node['content']
-            # fallback: first <img> with reasonable size
-            img = soup.find('img')
-            if img and img.get('src'):
-                return img['src']
-        except Exception:
+    def _get_reliable_image_for_article(self, article_group: List[Dict]) -> Optional[str]:
+        """
+        Get a reliable, decent quality image for an article.
+        Uses only RSS feed images to avoid 403 errors and blocking.
+        """
+        all_images = []
+        
+        for article in article_group:
+            # Get image from the article entry
+            image_url = article.get('image')
+            if image_url:
+                # Make sure it's absolute
+                article_link = article.get('link', '')
+                if article_link:
+                    image_url = self._make_absolute_url(image_url, article_link)
+                
+                # Score the image based on URL patterns
+                score = 0
+                url_lower = image_url.lower()
+                
+                # Prefer images from reputable CDNs
+                if any(cdn in url_lower for cdn in ['cdn', 'static', 'media', 'assets']):
+                    score += 10
+                
+                # Prefer larger images (check URL for size indicators)
+                if any(size in url_lower for size in ['large', 'full', 'original', 'high']):
+                    score += 20
+                elif any(size in url_lower for size in ['thumb', 'small', 'medium']):
+                    score -= 5
+                
+                # Prefer common image formats
+                if any(ext in url_lower for ext in ['.jpg', '.jpeg', '.png', '.webp']):
+                    score += 5
+                
+                all_images.append({
+                    'url': image_url,
+                    'score': score,
+                    'source': article.get('source', 'Unknown')
+                })
+        
+        if not all_images:
             return None
-        return None
+        
+        # Sort by score and return the best one
+        all_images.sort(key=lambda x: x['score'], reverse=True)
+        best_image = all_images[0]['url']
+        
+        # Try to upgrade resolution
+        upgraded = self._upgrade_image_resolution(best_image)
+        print(f"Selected image from {all_images[0]['source']}: {upgraded[:80]}...")
+        
+        return upgraded
     
     def _fetch_article_content(self, url: str) -> str:
         """Fetch full article content from URL"""
@@ -267,6 +409,141 @@ class MultiSourceNewsFetcher:
         
         return summary.strip()
     
+    def _select_best_image_with_gemini(self, images: List[Dict], title: str, bullet_points: List[str]) -> Optional[str]:
+        """
+        Select the best image from multiple sources using Gemini to validate relevance and quality.
+        Falls back to highest quality image if Gemini is unavailable.
+        """
+        if not images:
+            return None
+        
+        if len(images) == 1:
+            return self._upgrade_image_resolution(images[0]['url'])
+        
+        print(f"Selecting best image from {len(images)} candidates using Gemini...")
+        
+        # Upgrade all image URLs to higher resolution
+        scored_images = []
+        for img_data in images:
+            url = img_data.get('url', '')
+            if not url:
+                continue
+            
+            # Upgrade resolution
+            upgraded_url = self._upgrade_image_resolution(url)
+            
+            # Score based on source reputation and URL patterns
+            score = 0
+            url_lower = upgraded_url.lower()
+            source = img_data.get('source', '').lower()
+            
+            # Prefer images from reputable sources
+            if any(reputable in source for reputable in ['bbc', 'reuters', 'guardian', 'nytimes', 'cnn', 'npr']):
+                score += 10
+            
+            # Prefer full-size images (check URL patterns)
+            if any(pattern in url_lower for pattern in ['/full/', '/original/', '/large/', '/high-res']):
+                score += 20
+            elif any(pattern in url_lower for pattern in ['/thumb/', '/small/', '/medium/']):
+                score -= 10
+            
+            # Prefer images without size parameters (likely full resolution)
+            if '?' not in upgraded_url or not re.search(r'[?&](w|width|h|height|s|size)=\d+', upgraded_url):
+                score += 15
+            
+            scored_images.append({
+                'url': upgraded_url,
+                'original_url': url,
+                'score': score,
+                'source': img_data.get('source', 'Unknown')
+            })
+        
+        # Sort by score (highest first)
+        scored_images.sort(key=lambda x: x['score'], reverse=True)
+        
+        # Use Gemini to validate top candidates for relevance if available
+        if self.gemini_api_key and len(scored_images) > 0:
+            top_candidates = scored_images[:5]  # Check top 5 candidates
+            validated_image = self._validate_image_relevance_with_gemini(
+                top_candidates, title, bullet_points
+            )
+            if validated_image:
+                print(f"✓ Selected image validated by Gemini: {validated_image[:80]}...")
+                return validated_image
+        
+        # Return highest scored image if Gemini not available or validation failed
+        if scored_images:
+            best = scored_images[0]
+            print(f"✓ Selected best image from {best['source']}: {best['url'][:80]}...")
+            return best['url']
+        
+        return None
+    
+    def _validate_image_relevance_with_gemini(self, image_candidates: List[Dict], title: str, bullet_points: List[str]) -> Optional[str]:
+        """Use Gemini to validate which image is most relevant to the article."""
+        if not self.gemini_api_key or not image_candidates:
+            return None
+        
+        try:
+            import google.generativeai as genai
+            genai.configure(api_key=self.gemini_api_key)
+            
+            # Try to initialize model
+            model = None
+            for model_name in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']:
+                try:
+                    model = genai.GenerativeModel(model_name)
+                    break
+                except:
+                    continue
+            
+            if not model:
+                return None
+            
+            # Prepare context
+            bullets_text = "\n".join([f"- {bp}" for bp in bullet_points[:5]])  # Use first 5 bullets
+            
+            # Create prompt with image URLs
+            image_list = "\n".join([f"{i+1}. {c['url']} (from {c['source']})" for i, c in enumerate(image_candidates)])
+            
+            prompt = f"""You are analyzing news article images to determine which one is most relevant, appropriate, and high-quality for the story.
+
+Article Title: {title}
+
+Key Points:
+{bullets_text}
+
+Available Images:
+{image_list}
+
+Instructions:
+- Determine which image (1-{len(image_candidates)}) is most relevant to this news story
+- The image should directly relate to the event described in the article
+- Prefer high-quality, high-resolution images over low-resolution thumbnails
+- Avoid generic placeholder images, logos, or unrelated stock photos
+- The image should be from the actual event or story, not a generic illustration
+- Return ONLY the number (1-{len(image_candidates)}) of the best image, nothing else
+
+Best image number:"""
+            
+            response = model.generate_content(prompt)
+            result = response.text.strip()
+            
+            # Extract number from response
+            match = re.search(r'\b([1-9]|10)\b', result)
+            if match:
+                idx = int(match.group(1)) - 1
+                if 0 <= idx < len(image_candidates):
+                    selected = image_candidates[idx]
+                    print(f"✓ Gemini selected image {idx + 1} from {selected['source']}")
+                    return selected['url']
+            
+        except Exception as e:
+            print(f"Error validating image with Gemini: {e}")
+            return None
+        
+        return None
+    
     def _generate_bullets_with_gemini(self, source_summaries: List[Dict], title: str) -> List[str]:
         """Generate bullet points using Gemini API"""
         if not self.gemini_api_key:
@@ -342,9 +619,9 @@ Story Title: {title}
 Sources:{sources_text}
 
 Instructions:
-- Generate 5-7 bullet points that cover DIFFERENT aspects and angles of the story
+- Generate 3-7 bullet points that cover DIFFERENT aspects and angles of the story
 - Each bullet point should describe a different part, angle, or perspective of the event
-- Make bullet points informative, factual, and comprehensive (60-150 words each)
+- Make bullet points informative but keep them relatively short, similar to ground news.
 - Cover different aspects such as:
   * What happened (the core event)
   * Who was involved and their roles
@@ -353,11 +630,14 @@ Instructions:
   * Reactions from different parties
   * Historical context or background
   * Legal, political, or social implications
-- Each bullet should synthesize information from multiple sources, not just repeat one source
+- Each bullet should synthesize information from multiple sources, in short they should be objective 
 - Do NOT repeat the same information in multiple bullets
 - Write in clear, journalistic style
 - Number each bullet point (1., 2., 3., etc.)
 - Focus on creating diverse, comprehensive coverage that shows different facets of the story
+- IMPORTANT: Do NOT include any references to images, pictures, or photos in the bullet points (e.g., no "(2nd picture)", "(see image)", etc.)
+- Write only factual content about the event itself, not about visual elements
+- Do NOT use markdown formatting (no **bold**, *italic*, # headers, etc.) - write plain text only
 
 Bullet points:"""
             
@@ -373,6 +653,18 @@ Bullet points:"""
                     continue
                 # Remove numbering (1., 2., etc.) and clean up
                 cleaned = re.sub(r'^\d+[\.\)]\s*', '', line)
+                # Remove markdown formatting (**bold**, *italic*, etc.)
+                cleaned = re.sub(r'\*\*([^*]+)\*\*', r'\1', cleaned)  # Remove **bold**
+                cleaned = re.sub(r'\*([^*]+)\*', r'\1', cleaned)  # Remove *italic*
+                cleaned = re.sub(r'__([^_]+)__', r'\1', cleaned)  # Remove __bold__
+                cleaned = re.sub(r'_([^_]+)_', r'\1', cleaned)  # Remove _italic_
+                # Remove any "(2nd picture)", "(picture)", or similar text patterns
+                cleaned = re.sub(r'\s*\([^)]*(?:picture|image|photo|img)[^)]*\)\s*', '', cleaned, flags=re.IGNORECASE)
+                # Remove any remaining parenthetical references to images
+                cleaned = re.sub(r'\s*\([^)]*\d+[^)]*\)\s*$', '', cleaned)  # Remove trailing (2nd), (3rd), etc.
+                # Remove any markdown headers (# Header)
+                cleaned = re.sub(r'^#+\s*', '', cleaned)
+                cleaned = cleaned.strip()
                 if cleaned and len(cleaned) > 30:  # At least 30 characters
                     bullets.append(cleaned)
             
@@ -610,7 +902,17 @@ Bullet points:"""
                     print(f"  ✗ Skipped {source_name}: no summary available")
                 
                 if article.get('image'):
-                    images.append(article['image'])
+                    img_url = article['image']
+                    # Make URL absolute if it's relative
+                    article_url = article.get('link', '')
+                    if article_url:
+                        img_url = self._make_absolute_url(img_url, article_url)
+                    
+                    images.append({
+                        'url': img_url,
+                        'source': source_name,
+                        'article_url': article_url
+                    })
             
             print(f"Total sources with valid summaries: {len(source_summaries)}")
             
@@ -647,8 +949,8 @@ Bullet points:"""
             'sources': [{'source': s['source'], 'url': s['url']} for s in source_summaries]
         }
         
-        # Use first available image
-        main_image = images[0] if images else None
+        # Get reliable image from RSS feeds (simple approach, avoids 403 errors)
+        main_image = self._get_reliable_image_for_article(current_group) if current_group else None
         
         # Use the title from the main article
         title = main_article.get('title', 'Breaking News')

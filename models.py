@@ -113,6 +113,10 @@ class Article(db.Model):
     ai_generated = db.Column(db.Boolean, nullable=False, default=False)
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    # Geolocation fields
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    location_name = db.Column(db.String(200), nullable=True)  # Human-readable location name
     
     reactions = db.relationship("ArticleReaction", backref="article", lazy=True, cascade="all, delete-orphan")
     comments = db.relationship("Comment", back_populates="article", lazy=True, cascade="all, delete-orphan")

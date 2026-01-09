@@ -10,7 +10,6 @@ from models import User, Comment
 
 auth_bp = Blueprint("auth", __name__, url_prefix="")
 
-# Initialize OAuth (will be initialized in init_oauth)
 oauth = OAuth()
 
 
