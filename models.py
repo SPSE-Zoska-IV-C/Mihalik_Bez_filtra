@@ -170,6 +170,17 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     content = db.Column(db.Text, nullable=False)
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    parent_id = db.Column(db.Integer, db.ForeignKey("comment.id"), nullable=True)  # For replies
     
     article = db.relationship("Article", back_populates="comments", lazy=True)
     author = db.relationship("User", backref="comments", lazy=True)
+    parent = db.relationship("Comment", remote_side=[id], backref="replies")
+    
+    def get_reply_chain(self):
+        """Get the chain of usernames this comment is replying to"""
+        chain = []
+        current = self.parent
+        while current:
+            chain.append(current.author.username)
+            current = current.parent
+        return chain

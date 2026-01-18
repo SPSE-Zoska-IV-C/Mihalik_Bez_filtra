@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% block content %}
+<div class="container-wide container py-3">
   <div class="d-flex align-items-center justify-content-between mb-3">
     <h2 class="mb-0">Articles</h2>
     {% if current_user.is_authenticated %}
@@ -9,65 +10,146 @@
     {% endif %}
   </div>
   
-  <!-- Filter Tabs -->
-  <div class="mb-4">
-    <div class="d-flex flex-wrap gap-2 align-items-center">
-      <span class="text-muted me-2">Filter by:</span>
-      <div class="btn-group flex-wrap" role="group" aria-label="Article filters">
-        <a href="{{ url_for('list_articles') }}" 
-           class="btn btn-sm {% if not current_filter %}btn-primary{% else %}btn-outline-primary{% endif %}">
-          All
-        </a>
-        <a href="{{ url_for('list_articles', filter='ukraine') }}" 
-           class="btn btn-sm {% if current_filter == 'ukraine' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-          Ukraine
-        </a>
-        <a href="{{ url_for('list_articles', filter='israel') }}" 
-           class="btn btn-sm {% if current_filter == 'israel' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-          Israel
-        </a>
-        <a href="{{ url_for('list_articles', filter='usa') }}" 
-           class="btn btn-sm {% if current_filter == 'usa' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-          USA
-        </a>
-        <a href="{{ url_for('list_articles', filter='russia') }}" 
-           class="btn btn-sm {% if current_filter == 'russia' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-          Russia
-        </a>
-        <a href="{{ url_for('list_articles', filter='china') }}" 
-           class="btn btn-sm {% if current_filter == 'china' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-          China
-        </a>
-        <a href="{{ url_for('list_articles', filter='palestine') }}" 
-           class="btn btn-sm {% if current_filter == 'palestine' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-          Palestine
-        </a>
-        <a href="{{ url_for('list_articles', filter='gaza') }}" 
-           class="btn btn-sm {% if current_filter == 'gaza' %}btn-primary{% else %}btn-outline-primary{% endif %}">
-          Gaza
-        </a>
+  <div class="row">
+    <!-- Sidebar Filters -->
+    <div class="col-lg-2 col-xl-2 mb-4 mb-lg-0">
+      <div class="card filter-sidebar" style="position: sticky; top: 80px;">
+        <div class="card-header">
+          <h6 class="mb-0 fw-semibold">Filters</h6>
+        </div>
+        <div class="card-body p-2">
+          <div class="accordion accordion-flush" id="filterAccordion">
+            <!-- Countries Filter -->
+            <div class="accordion-item border-0">
+              <h2 class="accordion-header" id="headingCountries">
+                <button class="accordion-button collapsed py-2 px-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCountries" aria-expanded="false" aria-controls="collapseCountries">
+                  <small class="fw-semibold">Countries</small>
+                </button>
+              </h2>
+              <div id="collapseCountries" class="accordion-collapse collapse" aria-labelledby="headingCountries" data-bs-parent="#filterAccordion">
+                <div class="accordion-body p-2 pt-0">
+                  <div class="d-flex flex-column gap-1">
+                    <a href="{{ url_for('list_articles', filter='ukraine') }}" 
+                       class="filter-link {% if current_filter == 'ukraine' %}active{% endif %}">
+                      Ukraine
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='israel') }}" 
+                       class="filter-link {% if current_filter == 'israel' %}active{% endif %}">
+                      Israel
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='usa') }}" 
+                       class="filter-link {% if current_filter == 'usa' %}active{% endif %}">
+                      USA
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='russia') }}" 
+                       class="filter-link {% if current_filter == 'russia' %}active{% endif %}">
+                      Russia
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='china') }}" 
+                       class="filter-link {% if current_filter == 'china' %}active{% endif %}">
+                      China
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='palestine') }}" 
+                       class="filter-link {% if current_filter == 'palestine' %}active{% endif %}">
+                      Palestine
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='gaza') }}" 
+                       class="filter-link {% if current_filter == 'gaza' %}active{% endif %}">
+                      Gaza
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='europe') }}" 
+                       class="filter-link {% if current_filter == 'europe' %}active{% endif %}">
+                      Europe
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='uk') }}" 
+                       class="filter-link {% if current_filter == 'uk' %}active{% endif %}">
+                      United Kingdom
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- News Type Filter -->
+            <div class="accordion-item border-0">
+              <h2 class="accordion-header" id="headingType">
+                <button class="accordion-button collapsed py-2 px-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseType" aria-expanded="false" aria-controls="collapseType">
+                  <small class="fw-semibold">News Type</small>
+                </button>
+              </h2>
+              <div id="collapseType" class="accordion-collapse collapse" aria-labelledby="headingType" data-bs-parent="#filterAccordion">
+                <div class="accordion-body p-2 pt-0">
+                  <div class="d-flex flex-column gap-1">
+                    <a href="{{ url_for('list_articles', filter='war') }}" 
+                       class="filter-link {% if current_filter == 'war' %}active{% endif %}">
+                      War
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='speech') }}" 
+                       class="filter-link {% if current_filter == 'speech' %}active{% endif %}">
+                      Speech
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='meeting') }}" 
+                       class="filter-link {% if current_filter == 'meeting' %}active{% endif %}">
+                      Meeting
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='election') }}" 
+                       class="filter-link {% if current_filter == 'election' %}active{% endif %}">
+                      Election
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='protest') }}" 
+                       class="filter-link {% if current_filter == 'protest' %}active{% endif %}">
+                      Protest
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='economy') }}" 
+                       class="filter-link {% if current_filter == 'economy' %}active{% endif %}">
+                      Economy
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='technology') }}" 
+                       class="filter-link {% if current_filter == 'technology' %}active{% endif %}">
+                      Technology
+                    </a>
+                    <a href="{{ url_for('list_articles', filter='climate') }}" 
+                       class="filter-link {% if current_filter == 'climate' %}active{% endif %}">
+                      Climate
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Clear Filter -->
+            {% if current_filter %}
+            <div class="pt-2 border-top">
+              <a href="{{ url_for('list_articles') }}" class="filter-link-clear">
+                Clear Filters
+              </a>
+            </div>
+            {% endif %}
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-  
-  {% if current_search %}
-  <div class="alert alert-info mb-3">
-    Showing search results for: <strong>"{{ current_search }}"</strong>
-    <a href="{{ url_for('list_articles') }}" class="btn btn-sm btn-outline-primary ms-2">Clear search</a>
-  </div>
-  {% endif %}
-  
-  {% if current_filter %}
-  <div class="alert alert-info mb-3">
-    Showing articles filtered by: <strong>{{ current_filter|title }}</strong>
-    <a href="{{ url_for('list_articles') }}" class="btn btn-sm btn-outline-primary ms-2">Clear filter</a>
-  </div>
-  {% endif %}
-  
-  {% if articles %}
+    
+    <!-- Main Content -->
+    <div class="col-lg-10 col-xl-10">
+      {% if current_search %}
+      <div class="alert alert-info mb-3">
+        Showing search results for: <strong>"{{ current_search }}"</strong>
+        <a href="{{ url_for('list_articles') }}" class="btn btn-sm btn-outline-primary ms-2">Clear search</a>
+      </div>
+      {% endif %}
+      
+      {% if current_filter %}
+      <div class="alert alert-info mb-3">
+        Showing articles filtered by: <strong>{{ current_filter|title }}</strong>
+        <a href="{{ url_for('list_articles') }}" class="btn btn-sm btn-outline-primary ms-2">Clear filter</a>
+      </div>
+      {% endif %}
+      
+      {% if articles %}
     <div class="row">
       {% for article in articles %}
-        <div class="col-md-6 mb-4">
+        <div class="col-md-6 col-lg-4 col-xl-3 mb-4">
           <div class="card article-card h-100">
             <img 
               src="{{ article.cover_image_url(640, 360) }}" 
@@ -130,9 +212,11 @@
         </div>
       {% endfor %}
     </div>
-  {% else %}
-    <p>No articles yet. <a href="{{ url_for('add_article') }}">Add the first one</a>.</p>
-  {% endif %}
+      {% else %}
+        <p>No articles yet. <a href="{{ url_for('add_article') }}">Add the first one</a>.</p>
+      {% endif %}
+    </div>
+  </div>
 
   {% if current_user.is_authenticated %}
   <script>
@@ -163,6 +247,7 @@
     }
   </script>
   {% endif %}
+</div>
 {% endblock %}
 
 

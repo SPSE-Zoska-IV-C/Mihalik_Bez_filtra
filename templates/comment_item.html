@@ -1,0 +1,55 @@
+<div class="comment-item mb-2" id="comment-{{ comment.id }}" data-comment-id="{{ comment.id }}">
+  <div class="d-flex align-items-start">
+    <div class="flex-grow-1">
+      <p class="mb-1">
+        <strong>{{ comment.author.username }}</strong>
+        <small class="text-muted ms-2">{{ comment.date_posted.strftime('%Y-%m-%d %H:%M') }}</small>
+      </p>
+      {% if comment.parent %}
+        {% set reply_chain = comment.get_reply_chain() %}
+        <p class="mb-1 text-muted" style="font-size: 0.875rem;">
+          <small>Replying to 
+            {% for username in reply_chain|reverse %}
+              <strong>@{{ username }}</strong>{% if not loop.last %}, {% endif %}
+            {% endfor %}
+          </small>
+        </p>
+      {% endif %}
+      <p class="mb-1">{{ comment.content }}</p>
+      {% if current_user.is_authenticated %}
+        <button class="btn btn-sm btn-link p-0 text-muted reply-btn" 
+                data-comment-id="{{ comment.id }}" 
+                data-author="{{ comment.author.username }}"
+                onclick="showReplyForm({{ comment.id }}, '{{ comment.author.username }}')"
+                style="font-size: 0.875rem; text-decoration: none; border: none; background: none;">
+          Reply
+        </button>
+      {% endif %}
+    </div>
+  </div>
+  
+  <!-- Reply Form (hidden by default) -->
+  {% if current_user.is_authenticated %}
+  <div class="reply-form-container ms-4 mt-2" id="reply-form-{{ comment.id }}" style="display: none;">
+    <form class="reply-form" data-parent-id="{{ comment.id }}">
+      <div class="mb-2">
+        <textarea class="form-control form-control-sm" rows="2" placeholder="Write a reply..." required></textarea>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-sm btn-primary">Reply</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary cancel-reply-btn" onclick="hideReplyForm({{ comment.id }})">Cancel</button>
+      </div>
+    </form>
+  </div>
+  {% endif %}
+  
+  <!-- Replies -->
+  {% if comment.replies %}
+    <div class="replies-container ms-4 mt-2 border-start border-2 ps-3" style="border-color: var(--card-border);">
+      {% for reply in comment.replies %}
+        {% set comment = reply %}
+        {% include 'comment_item.html' %}
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>

@@ -126,18 +126,8 @@
           <div id="commentsList">
             {% if comments %}
               {% for comment in comments %}
-              <div class="mb-3 comment-item" id="comment-{{ comment.id }}">
-                <div class="d-flex align-items-start">
-                  <div class="flex-grow-1">
-                    <p class="mb-1">
-                      <strong>{{ comment.author.username }}</strong>
-                      <small class="text-muted ms-2">{{ comment.date_posted.strftime('%Y-%m-%d %H:%M') }}</small>
-                    </p>
-                    <p class="mb-0">{{ comment.content }}</p>
-                  </div>
-                </div>
+                {% include 'comment_item.html' %}
                 {% if not loop.last %}<hr class="my-3">{% endif %}
-              </div>
               {% endfor %}
             {% else %}
               <p class="text-muted">No comments yet. Be the first to comment!</p>
@@ -211,25 +201,8 @@
             commentsList.innerHTML = '';
           }
           
-          const commentHtml = `
-            <div class="mb-3 comment-item" id="comment-${data.comment.id}">
-              <div class="d-flex align-items-start">
-                <div class="flex-grow-1">
-                  <p class="mb-1">
-                    <strong>${data.comment.author}</strong>
-                    <small class="text-muted ms-2">${data.comment.date_posted}</small>
-                  </p>
-                  <p class="mb-0">${data.comment.content}</p>
-                </div>
-              </div>
-              <hr class="my-3">
-            </div>
-          `;
-          
-          commentsList.insertAdjacentHTML('beforeend', commentHtml);
-          
-          // Clear form
-          document.getElementById('commentText').value = '';
+          // Reload page to show new comment with proper nesting
+          location.reload();
         }
         formBtn.disabled = false;
         formBtn.textContent = originalText;
@@ -239,6 +212,78 @@
         formBtn.disabled = false;
         formBtn.textContent = originalText;
         alert('Failed to post comment. Please try again.');
+      });
+    });
+
+    // Reply functionality
+    let currentReplyParent = null;
+    
+    function showReplyForm(commentId, authorName) {
+      // Hide any other open reply forms
+      document.querySelectorAll('.reply-form-container').forEach(form => {
+        form.style.display = 'none';
+      });
+      
+      // Show reply form for this comment
+      const replyForm = document.getElementById(`reply-form-${commentId}`);
+      if (replyForm) {
+        replyForm.style.display = 'block';
+        currentReplyParent = commentId;
+        replyForm.querySelector('textarea').focus();
+      }
+    }
+    
+    function hideReplyForm(commentId) {
+      const replyForm = document.getElementById(`reply-form-${commentId}`);
+      if (replyForm) {
+        replyForm.style.display = 'none';
+        replyForm.querySelector('textarea').value = '';
+        currentReplyParent = null;
+      }
+    }
+    
+    // Handle reply form submissions
+    document.querySelectorAll('.reply-form').forEach(form => {
+      form.addEventListener('submit', function(e) {
+        e.preventDefault();
+        const parentId = parseInt(this.dataset.parentId);
+        const content = this.querySelector('textarea').value.trim();
+        
+        if (!content) return;
+        
+        const submitBtn = this.querySelector('button[type="submit"]');
+        const originalText = submitBtn.textContent;
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Posting...';
+        
+        fetch(`/article/{{ article.id }}/comment`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify({ 
+            content: content,
+            parent_id: parentId
+          })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            // Reload page to show reply with proper nesting
+            location.reload();
+          } else {
+            alert(data.error || 'Failed to post reply. Please try again.');
+            submitBtn.disabled = false;
+            submitBtn.textContent = originalText;
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('Failed to post reply. Please try again.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        });
       });
     });
   </script>

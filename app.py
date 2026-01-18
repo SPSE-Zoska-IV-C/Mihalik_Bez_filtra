@@ -65,6 +65,16 @@ with app.app_context():
         except Exception:
             pass
 
+    def _ensure_comment_columns():
+        try:
+            cols = db.session.execute(_sql_text("PRAGMA table_info('comment');")).fetchall()
+            existing = {c[1] for c in cols}
+            if 'parent_id' not in existing:
+                db.session.execute(_sql_text("ALTER TABLE comment ADD COLUMN parent_id INTEGER"))
+                db.session.commit()
+        except Exception:
+            pass
+
     def _ensure_user_columns():
         try:
             cols = db.session.execute(_sql_text("PRAGMA table_info('user');")).fetchall()
@@ -124,14 +134,19 @@ with app.app_context():
         else:
             _ensure_article_columns()
             _ensure_user_columns()
+            _ensure_comment_columns()
     except Exception:
         try:
             from flask_migrate import upgrade as _upgrade_fallback
             _upgrade_fallback()
             _ensure_article_columns()
             _ensure_user_columns()
+            _ensure_comment_columns()
         except Exception:
             db.create_all()
+            _ensure_article_columns()
+            _ensure_user_columns()
+            _ensure_comment_columns()
 
 @app.get("/")
 def index():
@@ -470,8 +485,25 @@ def article_detail(article_id):
         article_id=article_id, liked=True
     ).count()
     
-    # vratenie komentarov v poradi od datumu 
-    comments = Comment.query.filter_by(article_id=article_id).order_by(Comment.date_posted.asc()).all()
+    # Get top-level comments (no parent) ordered by date, then load replies
+    top_level_comments = Comment.query.filter_by(
+        article_id=article_id, 
+        parent_id=None
+    ).order_by(Comment.date_posted.asc()).all()
+    
+    # Get all comments with replies for this article
+    all_comments = Comment.query.filter_by(article_id=article_id).order_by(Comment.date_posted.asc()).all()
+    
+    # Build comment tree
+    comments_dict = {c.id: c for c in all_comments}
+    for comment in all_comments:
+        if comment.parent_id and comment.parent_id in comments_dict:
+            parent = comments_dict[comment.parent_id]
+            if not hasattr(parent, '_replies'):
+                parent._replies = []
+            parent._replies.append(comment)
+    
+    comments = top_level_comments
     
     return render_template("article_detail.html",
                          article=article,

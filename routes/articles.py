@@ -48,21 +48,32 @@ def toggle_like(article_id):
 @articles_bp.route("/article/<int:article_id>/comment", methods=["POST"])
 @login_required
 def add_comment(article_id):
-    """Add a user comment to an article"""
+    """Add a user comment to an article or reply to a comment"""
     article = Article.query.get_or_404(article_id)
     content = request.json.get("content", "").strip()
+    parent_id = request.json.get("parent_id", None)
     
     if not content:
         return jsonify({"success": False, "error": "Comment cannot be empty"}), 400
+    
+    # Validate parent_id if provided
+    if parent_id:
+        parent_comment = Comment.query.get(parent_id)
+        if not parent_comment or parent_comment.article_id != article_id:
+            return jsonify({"success": False, "error": "Invalid parent comment"}), 400
     
     # Create new comment
     comment = Comment(
         article_id=article_id,
         user_id=current_user.id,
-        content=content
+        content=content,
+        parent_id=parent_id if parent_id else None
     )
     db.session.add(comment)
     db.session.commit()
+    
+    # Get reply chain for display
+    reply_chain = comment.get_reply_chain()
     
     return jsonify({
         "success": True,
@@ -70,7 +81,11 @@ def add_comment(article_id):
             "id": comment.id,
             "content": comment.content,
             "author": current_user.username,
-            "date_posted": comment.date_posted.strftime('%Y-%m-%d %H:%M')
+            "author_id": current_user.id,
+            "date_posted": comment.date_posted.strftime('%Y-%m-%d %H:%M'),
+            "parent_id": comment.parent_id,
+            "reply_to": comment.parent.author.username if comment.parent else None,
+            "reply_chain": reply_chain
         },
         "article_id": article_id
     })

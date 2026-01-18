@@ -52,6 +52,183 @@ body {
   padding: 1rem;
 }
 
+/* Wider container on larger screens for articles and map */
+@media (min-width: 992px) {
+  .container-wide {
+    max-width: 1400px;
+  }
+}
+
+@media (min-width: 1200px) {
+  .container-wide {
+    max-width: 1600px;
+  }
+}
+
+/* Better spacing for filter buttons on wider screens */
+@media (min-width: 992px) {
+  .btn-group.flex-wrap {
+    gap: 0.5rem;
+  }
+}
+
+/* Sidebar filter styling */
+.filter-sidebar {
+  font-size: 0.875rem;
+}
+
+.filter-sidebar .card-header {
+  background-color: var(--card);
+  border-bottom: 1px solid var(--card-border);
+  padding: 0.75rem 1rem;
+}
+
+.filter-sidebar .card-header h6 {
+  color: var(--fg);
+  font-size: 0.875rem;
+}
+
+.accordion-button {
+  background-color: transparent;
+  color: var(--fg);
+  border: none;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.accordion-button:not(.collapsed) {
+  background-color: transparent;
+  color: var(--accent);
+  box-shadow: none;
+}
+
+.accordion-button:focus {
+  box-shadow: none;
+  border-color: transparent;
+}
+
+.accordion-button::after {
+  width: 0.75rem;
+  height: 0.75rem;
+  background-size: 0.75rem;
+}
+
+.accordion-item {
+  border: none;
+  background-color: transparent;
+}
+
+.accordion-body {
+  background-color: transparent;
+  padding: 0.5rem 0.75rem;
+}
+
+.filter-link {
+  display: block;
+  padding: 0.4rem 0.75rem;
+  color: var(--muted);
+  text-decoration: none;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  transition: all 0.2s ease;
+  margin-bottom: 0.25rem;
+}
+
+.filter-link:hover {
+  background-color: var(--card-contrast);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.filter-link.active {
+  background-color: var(--accent);
+  color: #051225;
+  font-weight: 600;
+}
+
+.filter-link-clear {
+  display: block;
+  padding: 0.4rem 0.75rem;
+  color: var(--muted);
+  text-decoration: none;
+  border-radius: 0.375rem;
+  font-size: 0.8125rem;
+  text-align: center;
+  transition: all 0.2s ease;
+}
+
+.filter-link-clear:hover {
+  background-color: var(--card-contrast);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+body[data-theme="dark"] .accordion-button {
+  background-color: transparent;
+  color: var(--fg);
+}
+
+body[data-theme="dark"] .accordion-button:not(.collapsed) {
+  background-color: transparent;
+  color: var(--accent);
+}
+
+body[data-theme="dark"] .accordion-item {
+  background-color: transparent;
+}
+
+body[data-theme="dark"] .accordion-body {
+  background-color: transparent;
+}
+
+body[data-theme="dark"] .filter-link:hover {
+  background-color: var(--card-contrast);
+}
+
+body[data-theme="dark"] .filter-link-clear:hover {
+  background-color: var(--card-contrast);
+}
+
+/* Comment replies styling */
+.replies-container {
+  margin-left: 2rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--card-border);
+}
+
+.comment-item {
+  margin-bottom: 1rem;
+}
+
+.reply-btn {
+  color: var(--muted) !important;
+  transition: color 0.2s ease;
+}
+
+.reply-btn:hover {
+  color: var(--accent) !important;
+}
+
+.reply-form-container {
+  margin-top: 0.5rem;
+}
+
+.reply-form-container textarea {
+  font-size: 0.875rem;
+}
+
+body[data-theme="dark"] .replies-container {
+  border-color: var(--card-border);
+}
+
+/* Responsive sidebar */
+@media (max-width: 991px) {
+  .filter-sidebar {
+    position: relative !important;
+    top: 0 !important;
+  }
+}
+
 /* Navbar should be full width */
 .navbar .container-fluid {
   max-width: 1400px;
