@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from extensions import db, bcrypt, login_manager, migrate
-from models import Article, User, ArticleReaction, Comment 
+from models import Article, User, ArticleReaction, Comment, Discussion, DiscussionComment 
 from routes.auth import auth_bp
 from routes.articles import articles_bp
 import os
@@ -50,8 +50,6 @@ with app.app_context():
                 alter_statements.append("ALTER TABLE article ADD COLUMN photo VARCHAR(500)")
             if 'source_url' not in existing:
                 alter_statements.append("ALTER TABLE article ADD COLUMN source_url VARCHAR(500)")
-            if 'ai_generated' not in existing:
-                alter_statements.append("ALTER TABLE article ADD COLUMN ai_generated BOOLEAN NOT NULL DEFAULT 0")
             if 'latitude' not in existing:
                 alter_statements.append("ALTER TABLE article ADD COLUMN latitude REAL")
             if 'longitude' not in existing:
@@ -147,6 +145,12 @@ with app.app_context():
             _ensure_article_columns()
             _ensure_user_columns()
             _ensure_comment_columns()
+
+    # Ensure tables for any new models (e.g., discussions) exist
+    try:
+        db.create_all()
+    except Exception:
+        pass
 
 @app.get("/")
 def index():
@@ -361,6 +365,83 @@ def list_articles():
                          current_search=search_query)
 
 
+@app.get("/discussions")
+def discussions():
+    """List all discussions, optionally filtered by article."""
+    article_id = request.args.get("article_id", type=int)
+    article = Article.query.get_or_404(article_id) if article_id else None
+    
+    if article:
+        discussions = Discussion.query.filter_by(article_id=article.id).order_by(Discussion.date_created.desc()).all()
+    else:
+        discussions = Discussion.query.order_by(Discussion.date_created.desc()).all()
+    
+    return render_template("discussions.html", discussions=discussions, article=article)
+
+
+@app.route("/discussions/new", methods=["GET", "POST"])
+@login_required
+def new_discussion():
+    """Create a new discussion (global or linked to an article)."""
+    if request.method == "POST":
+        title = request.form.get("title", "").strip()
+        question = request.form.get("question", "").strip()
+        article_id_raw = request.form.get("article_id", "").strip()
+        article_id = int(article_id_raw) if article_id_raw.isdigit() else None
+        
+        if not title or not question:
+            flash("Title and question are required to create a discussion.", "danger")
+            return redirect(request.referrer or url_for("new_discussion"))
+        
+        linked_article = None
+        if article_id:
+            linked_article = Article.query.get(article_id)
+        
+        discussion = Discussion(
+            title=title[:200],
+            question=question,
+            article=linked_article,
+            author=current_user
+        )
+        db.session.add(discussion)
+        db.session.commit()
+        flash("Discussion created successfully.", "success")
+        return redirect(url_for("discussion_detail", discussion_id=discussion.id))
+    
+    article_id = request.args.get("article_id", type=int)
+    article = Article.query.get_or_404(article_id) if article_id else None
+    return render_template("discussion_new.html", article=article)
+
+
+@app.get("/discussions/<int:discussion_id>")
+def discussion_detail(discussion_id: int):
+    """Show a single discussion with its comments."""
+    discussion = Discussion.query.get_or_404(discussion_id)
+    comments = DiscussionComment.query.filter_by(discussion_id=discussion.id).order_by(DiscussionComment.date_posted.asc()).all()
+    return render_template("discussion_detail.html", discussion=discussion, comments=comments)
+
+
+@app.post("/discussions/<int:discussion_id>/comment")
+@login_required
+def add_discussion_comment(discussion_id: int):
+    """Add a comment to a discussion."""
+    discussion = Discussion.query.get_or_404(discussion_id)
+    content = request.form.get("content", "").strip()
+    
+    if not content:
+        flash("Comment cannot be empty.", "danger")
+        return redirect(url_for("discussion_detail", discussion_id=discussion.id))
+    
+    comment = DiscussionComment(
+        discussion=discussion,
+        author=current_user,
+        content=content
+    )
+    db.session.add(comment)
+    db.session.commit()
+    flash("Comment added to discussion.", "success")
+    return redirect(url_for("discussion_detail", discussion_id=discussion.id))
+
 @app.post("/fetch_article")
 @login_required
 def fetch_article():
@@ -423,7 +504,6 @@ def fetch_article():
                 summary=summary,
                 photo=photo,
                 source_url=source_url,
-                ai_generated=False,
                 author=current_user,
                 date_posted=datetime.utcnow(),
                 latitude=location_data.get("latitude"),

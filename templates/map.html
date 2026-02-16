@@ -155,7 +155,7 @@
 </style>
 
 <div class="map-controls">
-    <h3>🌍 World News Map</h3>
+    <h3>World News Map</h3>
     <p>Click on markers to see article previews. Each marker represents a news story with its location.</p>
 </div>
 
@@ -223,7 +223,6 @@
             map.invalidateSize();
         }, 100);
 
-        // Create marker cluster group
         var markers = L.markerClusterGroup({
             chunkedLoading: true,
             spiderfyOnMaxZoom: true,

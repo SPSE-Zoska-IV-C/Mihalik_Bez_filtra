@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container-wide container py-3">
+  <div class="row">
+    <div class="col-lg-8 mx-auto">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Start New Discussion</h2>
+        <a href="{{ url_for('discussions', article_id=article.id) if article else url_for('discussions') }}" class="btn btn-outline-secondary btn-sm">
+          Back to Discussions
+        </a>
+      </div>
+
+      {% if article %}
+      <div class="alert alert-info mb-3">
+        This discussion will be linked to the article:
+        <a href="{{ url_for('article_detail', article_id=article.id) }}" class="fw-semibold text-decoration-none">
+          {{ article.title }}
+        </a>
+      </div>
+      {% endif %}
+
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title mb-3">Create a new discussion</h5>
+          <form method="post" action="{{ url_for('new_discussion') }}">
+            {% if article %}
+            <input type="hidden" name="article_id" value="{{ article.id }}">
+            {% endif %}
+            <div class="mb-3">
+              <label for="discussionTitle" class="form-label">Title</label>
+              <input type="text" class="form-control" id="discussionTitle" name="title" required maxlength="200" placeholder="Short summary of what you want to discuss">
+            </div>
+            <div class="mb-3">
+              <label for="discussionQuestion" class="form-label">Question / Topic</label>
+              <textarea class="form-control" id="discussionQuestion" name="question" rows="4" required placeholder="Describe what you want others to discuss or answer"></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary">Create Discussion</button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+

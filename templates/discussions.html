@@ -1,0 +1,67 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container-wide container py-3">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h2 class="mb-0">Discussions</h2>
+    {% if current_user.is_authenticated %}
+    <a href="{{ url_for('new_discussion') }}" class="btn btn-primary btn-sm">
+      Start New Discussion
+    </a>
+    {% endif %}
+  </div>
+
+  {% if article %}
+  <div class="alert alert-info mb-3">
+    Showing discussions for article:
+    <a href="{{ url_for('article_detail', article_id=article.id) }}" class="fw-semibold text-decoration-none">
+      {{ article.title }}
+    </a>
+    <a href="{{ url_for('discussions') }}" class="btn btn-sm btn-outline-secondary ms-2">Show all discussions</a>
+  </div>
+  {% endif %}
+
+  {% if discussions %}
+  <div class="row">
+    {% for discussion in discussions %}
+    <div class="col-md-6 col-lg-4 mb-4">
+      <div class="card h-100">
+        <div class="card-body d-flex flex-column">
+          <h5 class="card-title">
+            <a href="{{ url_for('discussion_detail', discussion_id=discussion.id) }}" class="text-decoration-none article-card-link">
+              {{ discussion.title }}
+            </a>
+          </h5>
+          <small class="text-muted d-block mb-2">
+            by <strong>{{ discussion.author.username }}</strong>
+            on {{ discussion.date_created.strftime('%Y-%m-%d %H:%M') }}
+          </small>
+          {% if discussion.article %}
+          <p class="mb-1"><small class="text-muted">Article:</small></p>
+          <p class="mb-2">
+            <a href="{{ url_for('article_detail', article_id=discussion.article.id) }}" class="text-decoration-none">
+              {{ discussion.article.title }}
+            </a>
+          </p>
+          {% endif %}
+          <p class="card-text text-muted mb-3" style="font-size: 0.9rem;">
+            {{ discussion.question[:160] + '...' if discussion.question|length > 160 else discussion.question }}
+          </p>
+          <div class="mt-auto d-flex justify-content-between align-items-center">
+            <a href="{{ url_for('discussion_detail', discussion_id=discussion.id) }}" class="btn btn-sm btn-outline-primary">
+              Open
+            </a>
+            <small class="text-muted">
+              {{ discussion.comments|length }} comments
+            </small>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="text-muted">No discussions yet. Be the first to start one.</p>
+  {% endif %}
+</div>
+{% endblock %}
+

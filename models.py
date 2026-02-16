@@ -110,7 +110,6 @@ class Article(db.Model):
     summary = db.Column(db.Text)
     photo = db.Column(db.String(500))
     source_url = db.Column(db.String(500))
-    ai_generated = db.Column(db.Boolean, nullable=False, default=False)
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     # Geolocation fields
@@ -184,3 +183,28 @@ class Comment(db.Model):
             chain.append(current.author.username)
             current = current.parent
         return chain
+
+
+class Discussion(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    question = db.Column(db.Text, nullable=False)
+    date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    # Optional link to an article
+    article_id = db.Column(db.Integer, db.ForeignKey("article.id"), nullable=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    
+    article = db.relationship("Article", backref="discussions", lazy=True)
+    author = db.relationship("User", backref="discussions", lazy=True)
+    comments = db.relationship("DiscussionComment", backref="discussion", lazy=True, cascade="all, delete-orphan")
+
+
+class DiscussionComment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    discussion_id = db.Column(db.Integer, db.ForeignKey("discussion.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    
+    author = db.relationship("User", backref="discussion_comments", lazy=True)
