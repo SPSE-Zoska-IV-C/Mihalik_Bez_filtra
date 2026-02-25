@@ -189,15 +189,70 @@ body[data-theme="dark"] .filter-link-clear:hover {
   background-color: var(--card-contrast);
 }
 
-/* Comment replies styling */
+/* Comment replies styling – border only under discussion groups */
 .replies-container {
   margin-left: 2rem;
   padding-left: 1rem;
-  border-left: 2px solid var(--card-border);
+  /* default no border; context selector will apply color */
+  border-left: 2px solid transparent;
+}
+
+/* show lines in discussion pages */
+.discussion-comments .replies-container {
+  border-color: var(--card-border);
+}
+
+/* hide lines in article comment sections */
+.article-comments .replies-container {
+  border-color: transparent !important;
+  border-left: none !important;
+  /* keep the left margin so replies remain indented */
 }
 
 .comment-item {
   margin-bottom: 1rem;
+}
+
+/* avatar inside comment item */
+.comment-item img {
+  flex-shrink: 0;
+}
+
+/* Discussion comments should look more like forum posts */
+.discussion-comments {
+  margin-top: 1rem;
+}
+
+/* Alerts should float above content a bit and fade nicely */
+.alert {
+  transition: opacity 0.4s ease;
+}
+
+/* flash messages container: fixed, not affecting layout */
+.flash-container {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1060;
+  width: auto;
+  max-width: 90%;
+}
+.flash-container .alert {
+  margin-bottom: 0.5rem;
+}
+
+/* section titles for grouped discussions */
+.discussion-group-title {
+  padding-top: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--card-border);
+  margin-bottom: 0.5rem;
+}
+.alert.auto-dismiss {
+  opacity: 1;
+}
+.alert.auto-dismiss.hide {
+  opacity: 0;
 }
 
 .reply-btn {

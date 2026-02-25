@@ -31,7 +31,7 @@
 
           {% if current_user.is_authenticated %}
           <div class="mb-4">
-            <form method="post" action="{{ url_for('add_discussion_comment', discussion_id=discussion.id) }}">
+            <form id="commentForm" method="post" action="{{ url_for('add_discussion_comment', discussion_id=discussion.id) }}">
               <div class="mb-3">
                 <label for="commentText" class="form-label">Add a comment</label>
                 <textarea class="form-control" id="commentText" name="content" rows="3" required placeholder="Share your thoughts..."></textarea>
@@ -48,16 +48,10 @@
           {% endif %}
 
           {% if comments %}
-          <div>
+          <div class="discussion-comments">
+            {% set is_discussion = true %}
             {% for comment in comments %}
-            <div class="mb-3">
-              <p class="mb-1">
-                <strong>{{ comment.author.username }}</strong>
-                <small class="text-muted ms-2">{{ comment.date_posted.strftime('%Y-%m-%d %H:%M') }}</small>
-              </p>
-              <p class="mb-0">{{ comment.content }}</p>
-              {% if not loop.last %}<hr class="my-3">{% endif %}
-            </div>
+              {% include 'comment_item.html' %}
             {% endfor %}
           </div>
           {% else %}
@@ -71,9 +65,118 @@
         {% if discussion.article %}
         <a href="{{ url_for('article_detail', article_id=discussion.article.id) }}" class="btn btn-outline-primary btn-sm">Back to article</a>
         {% endif %}
+        {% if current_user.is_authenticated and (current_user.id == discussion.user_id or current_user.is_admin) %}
+        <form method="post" action="{{ url_for('delete_discussion', discussion_id=discussion.id) }}" style="display:inline;">
+          <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('Delete this discussion?');">Delete</button>
+        </form>
+        {% endif %}
       </div>
     </div>
   </div>
 </div>
+
+{% if current_user.is_authenticated %}
+<script>
+  // submit new discussion comment via AJAX so page doesn't jump
+  const discussionForm = document.querySelector('#commentForm');
+  if (discussionForm) {
+    discussionForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const textarea = this.querySelector('textarea');
+      const content = textarea.value.trim();
+      if (!content) return;
+
+      const submitBtn = this.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Posting...';
+
+      fetch(`{{ url_for('add_discussion_comment', discussion_id=discussion.id) }}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ content: content })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          location.reload();
+        }
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      })
+      .catch(err => {
+        console.error(err);
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        alert('Failed to post comment. Please try again.');
+      });
+    });
+  }
+
+  // reply functionality (identical to article version)
+  let currentReplyParent = null;
+  function showReplyForm(commentId, authorName) {
+    document.querySelectorAll('.reply-form-container').forEach(form => {
+      form.style.display = 'none';
+    });
+    const replyForm = document.getElementById(`reply-form-${commentId}`);
+    if (replyForm) {
+      replyForm.style.display = 'block';
+      currentReplyParent = commentId;
+      replyForm.querySelector('textarea').focus();
+    }
+  }
+  function hideReplyForm(commentId) {
+    const replyForm = document.getElementById(`reply-form-${commentId}`);
+    if (replyForm) {
+      replyForm.style.display = 'none';
+      replyForm.querySelector('textarea').value = '';
+      currentReplyParent = null;
+    }
+  }
+  document.querySelectorAll('.reply-form').forEach(form => {
+    form.addEventListener('submit', function(e) {
+      e.preventDefault();
+      const parentId = parseInt(this.dataset.parentId);
+      const content = this.querySelector('textarea').value.trim();
+      if (!content) return;
+
+      const submitBtn = this.querySelector('button[type="submit"]');
+      const originalText = submitBtn.textContent;
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Posting...';
+
+      fetch(`{{ url_for('add_discussion_comment', discussion_id=discussion.id) }}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ content: content, parent_id: parentId })
+      })
+      .then(response => response.json())
+      .then(data => {
+        if (data.success) {
+          location.reload();
+        } else {
+          alert(data.error || 'Failed to post reply. Please try again.');
+          submitBtn.disabled = false;
+          submitBtn.textContent = originalText;
+        }
+      })
+      .catch(error => {
+        console.error('Error:', error);
+        alert('Failed to post reply. Please try again.');
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+      });
+    });
+  });
+</script>
+{% endif %}
+
 {% endblock %}
 

@@ -73,6 +73,18 @@ with app.app_context():
         except Exception:
             pass
 
+    def _ensure_discussion_comment_columns():
+        try:
+            cols = db.session.execute(_sql_text("PRAGMA table_info('discussion_comment');")).fetchall()
+            existing = {c[1] for c in cols}
+            if 'parent_id' not in existing:
+                db.session.execute(_sql_text("ALTER TABLE discussion_comment ADD COLUMN parent_id INTEGER"))
+                # SQLite needs manual FK creation; we'll skip the constraint but
+                # at least have the column
+                db.session.commit()
+        except Exception:
+            pass
+
     def _ensure_user_columns():
         try:
             cols = db.session.execute(_sql_text("PRAGMA table_info('user');")).fetchall()
@@ -133,6 +145,7 @@ with app.app_context():
             _ensure_article_columns()
             _ensure_user_columns()
             _ensure_comment_columns()
+            _ensure_discussion_comment_columns()
     except Exception:
         try:
             from flask_migrate import upgrade as _upgrade_fallback
@@ -140,17 +153,16 @@ with app.app_context():
             _ensure_article_columns()
             _ensure_user_columns()
             _ensure_comment_columns()
+            _ensure_discussion_comment_columns()
         except Exception:
             db.create_all()
             _ensure_article_columns()
             _ensure_user_columns()
             _ensure_comment_columns()
+            _ensure_discussion_comment_columns()
 
-    # Ensure tables for any new models (e.g., discussions) exist
-    try:
-        db.create_all()
-    except Exception:
-        pass
+    # ensure the discussion_comment table exists too
+    db.create_all()
 
 @app.get("/")
 def index():
@@ -367,16 +379,40 @@ def list_articles():
 
 @app.get("/discussions")
 def discussions():
-    """List all discussions, optionally filtered by article."""
+    """List all discussions, optionally filtered by article.
+
+    When not filtering by a specific article we build up a simple
+    "category" grouping keyed by the linked article (or ``None`` for
+    general/global discussions). The template then iterates over the
+    groups which produces a clearer, more hierarchical listing that
+    better resembles a forum with categories/sub‑forums.
+    """
     article_id = request.args.get("article_id", type=int)
     article = Article.query.get_or_404(article_id) if article_id else None
-    
+
     if article:
         discussions = Discussion.query.filter_by(article_id=article.id).order_by(Discussion.date_created.desc()).all()
-    else:
-        discussions = Discussion.query.order_by(Discussion.date_created.desc()).all()
-    
-    return render_template("discussions.html", discussions=discussions, article=article)
+        # when filtering we simply render the flat list and pass the
+        # selected article so the template can show a header.
+        return render_template("discussions.html", discussions=discussions, article=article)
+
+    # otherwise fetch everything and group by linked article
+    all_discussions = Discussion.query.order_by(Discussion.date_created.desc()).all()
+    groups = {}
+    for d in all_discussions:
+        key = d.article  # None for general discussion
+        groups.setdefault(key, []).append(d)
+
+    # convert to list of pairs so Jinja preserves order
+    grouped_list = []
+    # general first
+    if None in groups:
+        grouped_list.append((None, groups.pop(None)))
+    # then any article‑specific groups in descending date order of first item
+    for art, ds in groups.items():
+        grouped_list.append((art, ds))
+
+    return render_template("discussions.html", groups=grouped_list, article=None)
 
 
 @app.route("/discussions/new", methods=["GET", "POST"])
@@ -413,23 +449,75 @@ def new_discussion():
     return render_template("discussion_new.html", article=article)
 
 
+@app.post("/discussions/<int:discussion_id>/delete")
+@login_required
+def delete_discussion(discussion_id: int):
+    """Remove a discussion. Only the author or an admin may delete."""
+    discussion = Discussion.query.get_or_404(discussion_id)
+    if discussion.user_id != current_user.id and not current_user.is_admin:
+        flash("You are not allowed to delete that discussion.", "danger")
+        return redirect(url_for("discussion_detail", discussion_id=discussion.id))
+
+    # delete cascades to comments via relationship
+    db.session.delete(discussion)
+    db.session.commit()
+    flash("Discussion deleted.", "success")
+    return redirect(url_for("discussions"))
+
+
 @app.get("/discussions/<int:discussion_id>")
 def discussion_detail(discussion_id: int):
-    """Show a single discussion with its comments."""
+    """Show a single discussion with its comments, organised into a tree."""
     discussion = Discussion.query.get_or_404(discussion_id)
-    comments = DiscussionComment.query.filter_by(discussion_id=discussion.id).order_by(DiscussionComment.date_posted.asc()).all()
-    return render_template("discussion_detail.html", discussion=discussion, comments=comments)
+    # fetch all comments and then build a parent/child structure just like
+    # we do for articles.
+    all_comments = DiscussionComment.query.filter_by(
+        discussion_id=discussion.id
+    ).order_by(DiscussionComment.date_posted.asc()).all()
+
+    # map id -> comment
+    comments_dict = {c.id: c for c in all_comments}
+    for c in all_comments:
+        if c.parent_id and c.parent_id in comments_dict:
+            parent = comments_dict[c.parent_id]
+            if not hasattr(parent, '_replies'):
+                parent._replies = []
+            parent._replies.append(c)
+
+    top_level_comments = [c for c in all_comments if c.parent_id is None]
+
+    return render_template(
+        "discussion_detail.html",
+        discussion=discussion,
+        comments=top_level_comments,
+    )
 
 
 @app.post("/discussions/<int:discussion_id>/comment")
 @login_required
 def add_discussion_comment(discussion_id: int):
-    """Add a comment to a discussion."""
+    """Add a comment (or reply) to a discussion.
+
+    Accepts both regular form submissions and AJAX JSON requests for
+    inline replies. ``parent_id`` may be provided to create a nested
+    comment.
+    """
     discussion = Discussion.query.get_or_404(discussion_id)
-    content = request.form.get("content", "").strip()
+
+    # support both form-encoded and JSON bodies for AJAX
+    if request.is_json:
+        data = request.get_json()
+        content = (data.get("content", "") or "").strip()
+        parent_id = data.get("parent_id")
+    else:
+        content = (request.form.get("content", "") or "").strip()
+        parent_id = request.form.get("parent_id")
     
     if not content:
-        flash("Comment cannot be empty.", "danger")
+        msg = "Comment cannot be empty."
+        if request.is_json:
+            return {"success": False, "error": msg}, 400
+        flash(msg, "danger")
         return redirect(url_for("discussion_detail", discussion_id=discussion.id))
     
     comment = DiscussionComment(
@@ -437,8 +525,20 @@ def add_discussion_comment(discussion_id: int):
         author=current_user,
         content=content
     )
+    if parent_id:
+        try:
+            pid = int(parent_id)
+            parent = DiscussionComment.query.get(pid)
+            if parent and parent.discussion_id == discussion.id:
+                comment.parent = parent
+        except (ValueError, TypeError):
+            pass
     db.session.add(comment)
     db.session.commit()
+    
+    if request.is_json:
+        return {"success": True}
+
     flash("Comment added to discussion.", "success")
     return redirect(url_for("discussion_detail", discussion_id=discussion.id))
 

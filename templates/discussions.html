@@ -20,47 +20,96 @@
   </div>
   {% endif %}
 
-  {% if discussions %}
-  <div class="row">
-    {% for discussion in discussions %}
-    <div class="col-md-6 col-lg-4 mb-4">
-      <div class="card h-100">
-        <div class="card-body d-flex flex-column">
-          <h5 class="card-title">
-            <a href="{{ url_for('discussion_detail', discussion_id=discussion.id) }}" class="text-decoration-none article-card-link">
-              {{ discussion.title }}
-            </a>
-          </h5>
-          <small class="text-muted d-block mb-2">
-            by <strong>{{ discussion.author.username }}</strong>
-            on {{ discussion.date_created.strftime('%Y-%m-%d %H:%M') }}
-          </small>
-          {% if discussion.article %}
-          <p class="mb-1"><small class="text-muted">Article:</small></p>
-          <p class="mb-2">
-            <a href="{{ url_for('article_detail', article_id=discussion.article.id) }}" class="text-decoration-none">
-              {{ discussion.article.title }}
-            </a>
-          </p>
-          {% endif %}
-          <p class="card-text text-muted mb-3" style="font-size: 0.9rem;">
-            {{ discussion.question[:160] + '...' if discussion.question|length > 160 else discussion.question }}
-          </p>
-          <div class="mt-auto d-flex justify-content-between align-items-center">
-            <a href="{{ url_for('discussion_detail', discussion_id=discussion.id) }}" class="btn btn-sm btn-outline-primary">
-              Open
-            </a>
-            <small class="text-muted">
-              {{ discussion.comments|length }} comments
-            </small>
+  {# if the view provided a `groups` variable we are not
+     filtering; render each category separately. otherwise fall back to
+     the old behaviour which expects a flat `discussions` list #}
+  {% if groups is defined %}
+    {% for art, ds in groups %}
+      <h4 class="discussion-group-title">
+        {% if art %}Forum: {{ art.title }}{% else %}General Discussions{% endif %}
+      </h4>
+      <div class="row">
+        {% for discussion in ds %}
+          <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100">
+              <div class="card-body d-flex flex-column">
+                <h5 class="card-title">
+                  <a href="{{ url_for('discussion_detail', discussion_id=discussion.id) }}" class="text-decoration-none article-card-link">
+                    {{ discussion.title }}
+                  </a>
+                </h5>
+                <small class="text-muted d-block mb-2">
+                  by <strong>{{ discussion.author.username }}</strong>
+                  on {{ discussion.date_created.strftime('%Y-%m-%d %H:%M') }}
+                </small>
+                {% if discussion.article %}
+                <p class="mb-1"><small class="text-muted">Article:</small></p>
+                <p class="mb-2">
+                  <a href="{{ url_for('article_detail', article_id=discussion.article.id) }}" class="text-decoration-none">
+                    {{ discussion.article.title }}
+                  </a>
+                </p>
+                {% endif %}
+                <p class="card-text text-muted mb-3" style="font-size: 0.9rem;">
+                  {{ discussion.question[:160] + '...' if discussion.question|length > 160 else discussion.question }}
+                </p>
+                <div class="mt-auto d-flex justify-content-between align-items-center">
+                  <a href="{{ url_for('discussion_detail', discussion_id=discussion.id) }}" class="btn btn-sm btn-outline-primary">
+                    Open
+                  </a>
+                  <small class="text-muted">
+                    {{ discussion.comments|length }} comments
+                  </small>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
+        {% endfor %}
       </div>
-    </div>
     {% endfor %}
-  </div>
   {% else %}
-  <p class="text-muted">No discussions yet. Be the first to start one.</p>
+    {% if discussions %}
+      <div class="row">
+        {% for discussion in discussions %}
+          <div class="col-md-6 col-lg-4 mb-4">
+            <div class="card h-100">
+              <div class="card-body d-flex flex-column">
+                <h5 class="card-title">
+                  <a href="{{ url_for('discussion_detail', discussion_id=discussion.id) }}" class="text-decoration-none article-card-link">
+                    {{ discussion.title }}
+                  </a>
+                </h5>
+                <small class="text-muted d-block mb-2">
+                  by <strong>{{ discussion.author.username }}</strong>
+                  on {{ discussion.date_created.strftime('%Y-%m-%d %H:%M') }}
+                </small>
+                {% if discussion.article %}
+                <p class="mb-1"><small class="text-muted">Article:</small></p>
+                <p class="mb-2">
+                  <a href="{{ url_for('article_detail', article_id=discussion.article.id) }}" class="text-decoration-none">
+                    {{ discussion.article.title }}
+                  </a>
+                </p>
+                {% endif %}
+                <p class="card-text text-muted mb-3" style="font-size: 0.9rem;">
+                  {{ discussion.question[:160] + '...' if discussion.question|length > 160 else discussion.question }}
+                </p>
+                <div class="mt-auto d-flex justify-content-between align-items-center">
+                  <a href="{{ url_for('discussion_detail', discussion_id=discussion.id) }}" class="btn btn-sm btn-outline-primary">
+                    Open
+                  </a>
+                  <small class="text-muted">
+                    {{ discussion.comments|length }} comments
+                  </small>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-muted">No discussions yet. Be the first to start one.</p>
+    {% endif %}
   {% endif %}
 </div>
 {% endblock %}
