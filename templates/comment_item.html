@@ -1,14 +1,19 @@
-<div class="comment-item mb-2" id="comment-{{ comment.id }}" data-comment-id="{{ comment.id }}">
+<div class="comment-item {% if is_discussion %}forum-comment{% else %}article-comment{% endif %} mb-2"
+     id="comment-{{ comment.id }}"
+     data-comment-id="{{ comment.id }}">
   <div class="d-flex align-items-start">
     <img src="{{ comment.author.profile_image_url(48) }}" alt="avatar" class="rounded-circle me-2" width="32" height="32">
     <div class="flex-grow-1">
-      <p class="mb-1">
-        <strong>{{ comment.author.username }}</strong>
-        <small class="text-muted ms-2">{{ comment.date_posted.strftime('%Y-%m-%d %H:%M') }}</small>
-      </p>
+      <div class="comment-meta d-flex flex-wrap align-items-center mb-1">
+        <strong class="me-2">{{ comment.author.username }}</strong>
+        <small class="text-muted me-2">{{ comment.date_posted.strftime('%Y-%m-%d %H:%M') }}</small>
+        {% if is_discussion %}
+        <span class="badge bg-secondary-subtle text-muted fw-normal forum-badge">Post</span>
+        {% endif %}
+      </div>
       {% if comment.parent %}
         {% set reply_chain = comment.get_reply_chain() %}
-        <p class="mb-1 text-muted" style="font-size: 0.875rem;">
+        <p class="mb-1 text-muted reply-chain">
           <small>Replying to 
             {% for username in reply_chain|reverse %}
               <strong>@{{ username }}</strong>{% if not loop.last %}, {% endif %}
@@ -16,13 +21,12 @@
           </small>
         </p>
       {% endif %}
-      <p class="mb-1">{{ comment.content }}</p>
+      <p class="mb-1 comment-body-text">{{ comment.content }}</p>
       {% if current_user.is_authenticated %}
         <button class="btn btn-sm btn-link p-0 text-muted reply-btn" 
                 data-comment-id="{{ comment.id }}" 
                 data-author="{{ comment.author.username }}"
-                onclick="showReplyForm({{ comment.id }}, '{{ comment.author.username }}')"
-                style="font-size: 0.875rem; text-decoration: none; border: none; background: none;">
+                onclick="showReplyForm({{ comment.id }}, '{{ comment.author.username }}')">
           Reply
         </button>
       {% endif %}

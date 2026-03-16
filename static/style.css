@@ -213,6 +213,42 @@ body[data-theme="dark"] .filter-link-clear:hover {
   margin-bottom: 1rem;
 }
 
+/* Article comments: simple, lightweight bubbles */
+.comment-item.article-comment {
+  padding: 0.4rem 0;
+}
+
+/* Forum-style discussion comments: more like posts */
+.comment-item.forum-comment {
+  padding: 0.75rem 0.85rem;
+  border-radius: 0.65rem;
+  background-color: var(--card-contrast);
+  border: 1px solid var(--card-border);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+}
+
+.discussion-comments .comment-item.forum-comment {
+  margin-bottom: 0.75rem;
+}
+
+.comment-meta {
+  font-size: 0.85rem;
+}
+
+.reply-chain {
+  font-size: 0.8rem;
+}
+
+.comment-body-text {
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.forum-badge {
+  background-color: rgba(148, 163, 184, 0.1) !important;
+  border-radius: 999px;
+}
+
 /* avatar inside comment item */
 .comment-item img {
   flex-shrink: 0;
