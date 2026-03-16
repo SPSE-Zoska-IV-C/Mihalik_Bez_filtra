@@ -12,14 +12,14 @@ load_dotenv()
 
 app = Flask(__name__)
 
-instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
-os.makedirs(instance_path, exist_ok=True)
-
-# Prefer DATABASE_URL (e.g. for Vercel/production), fall back to local SQLite
+# Prefer DATABASE_URL (e.g. for Vercel/production). Only create a local
+# writable instance folder when we actually use SQLite (local dev).
 database_url = os.getenv("DATABASE_URL")
 if database_url:
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 else:
+    instance_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'instance')
+    os.makedirs(instance_path, exist_ok=True)
     db_path = os.path.join(instance_path, 'site.db')
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
