@@ -17,28 +17,28 @@ import os
 class MultiSourceNewsFetcher:
     """Fetches news from multiple sources and groups by topic"""
     
-    # Real RSS feeds from reputable news sources - expanded list
+    
     RSS_FEEDS = [
-        # Major international news
-        "https://feeds.bbci.co.uk/news/rss.xml",  # BBC News
-        "https://feeds.bbci.co.uk/news/world/rss.xml",  # BBC World
-        "https://rss.cnn.com/rss/edition.rss",  # CNN
-        "https://rss.cnn.com/rss/edition_world.rss",  # CNN World
-        "https://feeds.reuters.com/reuters/topNews",  # Reuters Top
-        "https://feeds.reuters.com/reuters/worldNews",  # Reuters World
-        "https://feeds.npr.org/1001/rss.xml",  # NPR
-        "https://www.theguardian.com/world/rss",  # The Guardian World
-        "https://www.theguardian.com/international/rss",  # The Guardian International
-        "https://feeds.abcnews.com/abcnews/topstories",  # ABC News
-        "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",  # NY Times World
-        "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",  # NY Times Home
-        # Additional sources
-        "https://feeds.washingtonpost.com/rss/world",  # Washington Post World
-        "https://www.aljazeera.com/xml/rss/all.xml",  # Al Jazeera
-        "https://feeds.feedburner.com/time/world",  # Time World
-        "https://feeds.feedburner.com/time/topstories",  # Time Top Stories
-        "https://www.nbcnews.com/rss",  # NBC News
-        "https://feeds.cbsnews.com/CBSNewsMain",  # CBS News
+        
+        "https://feeds.bbci.co.uk/news/rss.xml",  
+        "https://feeds.bbci.co.uk/news/world/rss.xml",  
+        "https://rss.cnn.com/rss/edition.rss",  
+        "https://rss.cnn.com/rss/edition_world.rss",  
+        "https://feeds.reuters.com/reuters/topNews",  
+        "https://feeds.reuters.com/reuters/worldNews",  
+        "https://feeds.npr.org/1001/rss.xml",  
+        "https://www.theguardian.com/world/rss",  
+        "https://www.theguardian.com/international/rss",  
+        "https://feeds.abcnews.com/abcnews/topstories",  
+        "https://rss.nytimes.com/services/xml/rss/nyt/World.xml",  
+        "https://rss.nytimes.com/services/xml/rss/nyt/HomePage.xml",  
+        
+        "https://feeds.washingtonpost.com/rss/world",  
+        "https://www.aljazeera.com/xml/rss/all.xml",  
+        "https://feeds.feedburner.com/time/world",  
+        "https://feeds.feedburner.com/time/topstories",  
+        "https://www.nbcnews.com/rss",  
+        "https://feeds.cbsnews.com/CBSNewsMain",  
     ]
     
     def __init__(self, gemini_api_key: Optional[str] = None):
@@ -67,8 +67,8 @@ class MultiSourceNewsFetcher:
                 feed = feedparser.parse(feed_url)
                 source_name = self._extract_source_name(feed_url)
                 
-                for entry in feed.entries[:50]:  # Get many more entries per feed to find overlapping stories
-                    # Try multiple fields for summary/description
+                for entry in feed.entries[:50]:  
+                    
                     summary_text = (entry.get('summary', '') or 
                                    entry.get('description', '') or
                                    entry.get('content', [{}])[0].get('value', '') if isinstance(entry.get('content'), list) else '')
@@ -83,11 +83,11 @@ class MultiSourceNewsFetcher:
                         'source_url': feed_url
                     }
                     
-                    # Try to get image from media tags or content
+                    
                     article['image'] = self._extract_image(entry)
                     
-                    # Don't fetch full content - use RSS summary only for speed
-                    # article['content'] = ''  # Will use summary instead
+                    
+                    
                     
                     all_articles.append(article)
             except Exception as e:
@@ -133,20 +133,20 @@ class MultiSourceNewsFetcher:
         article_link = entry.get('link', '')
         images_found = []
         
-        # Priority 1: Check media_content (usually best quality in RSS)
+        
         if hasattr(entry, 'media_content'):
             for media in entry.media_content:
                 if media.get('type', '').startswith('image'):
                     url = media.get('url')
                     if url:
                         url = self._make_absolute_url(url, article_link)
-                        # Get dimensions if available
+                        
                         width = int(media.get('width', 0) or 0)
                         height = int(media.get('height', 0) or 0)
-                        size = width * height if width and height else 100000  # High priority
+                        size = width * height if width and height else 100000  
                         images_found.append((url, size, 'media_content', width, height))
         
-        # Priority 2: Check media_thumbnail (fallback, usually smaller)
+        
         if hasattr(entry, 'media_thumbnail'):
             for thumb in entry.media_thumbnail:
                 url = thumb.get('url')
@@ -154,10 +154,10 @@ class MultiSourceNewsFetcher:
                     url = self._make_absolute_url(url, article_link)
                     width = int(thumb.get('width', 0) or 0)
                     height = int(thumb.get('height', 0) or 0)
-                    size = width * height if width and height else 50000  # Medium priority
+                    size = width * height if width and height else 50000  
                     images_found.append((url, size, 'thumbnail', width, height))
         
-        # Priority 3: Check summary/description for img tags (HTML embedded)
+        
         summary = entry.get('summary', '') or entry.get('description', '')
         if summary:
             soup = BeautifulSoup(summary, 'html.parser')
@@ -166,25 +166,25 @@ class MultiSourceNewsFetcher:
                 src = img.get('src') or img.get('data-src') or img.get('data-lazy-src')
                 if src:
                     src = self._make_absolute_url(src, article_link)
-                    # Skip very small images (likely icons)
+                    
                     width = int(img.get('width', 0) or 0)
                     height = int(img.get('height', 0) or 0)
                     if width > 0 and height > 0 and (width < 100 or height < 100):
-                        continue  # Skip tiny images
-                    size = width * height if width and height else 30000  # Lower priority
+                        continue  
+                    size = width * height if width and height else 30000  
                     images_found.append((src, size, 'html', width, height))
         
-        # Select best image: prefer media_content, then by size
+        
         if images_found:
-            # Sort: media_content first, then by size
+            
             images_found.sort(key=lambda x: (
-                x[2] == 'media_content',  # media_content preferred
-                x[2] == 'thumbnail',      # thumbnail second
-                x[1]  # then by size
+                x[2] == 'media_content',  
+                x[2] == 'thumbnail',      
+                x[1]  
             ), reverse=True)
             
             best_url = images_found[0][0]
-            # Try to upgrade resolution if it's a thumbnail
+            
             if images_found[0][2] == 'thumbnail' or (images_found[0][3] > 0 and images_found[0][3] < 400):
                 best_url = self._upgrade_image_resolution(best_url)
             
@@ -197,15 +197,15 @@ class MultiSourceNewsFetcher:
         if not url:
             return url
         
-        # Already absolute
+        
         if url.startswith('http://') or url.startswith('https://'):
             return url
         
-        # Protocol-relative URL
+        
         if url.startswith('//'):
             return 'https:' + url
         
-        # Relative URL - need base URL
+        
         if base_url:
             from urllib.parse import urljoin
             return urljoin(base_url, url)
@@ -217,10 +217,10 @@ class MultiSourceNewsFetcher:
         if not image_url:
             return image_url
         
-        # Common patterns to remove size restrictions
+        
         upgraded_url = image_url
         
-        # Remove common size parameters from URLs
+        
         patterns_to_remove = [
             r'[?&](w|width)=\d+',
             r'[?&](h|height)=\d+',
@@ -233,7 +233,7 @@ class MultiSourceNewsFetcher:
         for pattern in patterns_to_remove:
             upgraded_url = re.sub(pattern, '', upgraded_url, flags=re.IGNORECASE)
         
-        # For some CDNs, try to get original/full size
+        
         replacements = [
             ('/thumb/', '/'),
             ('/thumbnail/', '/'),
@@ -251,7 +251,7 @@ class MultiSourceNewsFetcher:
                 upgraded_url = upgraded_url.replace(old, new, 1).replace(old.upper(), new, 1)
                 break
         
-        # Clean up double slashes and trailing query separators
+        
         upgraded_url = re.sub(r'[?&]+', '&', upgraded_url)
         upgraded_url = upgraded_url.rstrip('&?')
         if upgraded_url.endswith('&'):
@@ -267,29 +267,29 @@ class MultiSourceNewsFetcher:
         all_images = []
         
         for article in article_group:
-            # Get image from the article entry
+            
             image_url = article.get('image')
             if image_url:
-                # Make sure it's absolute
+                
                 article_link = article.get('link', '')
                 if article_link:
                     image_url = self._make_absolute_url(image_url, article_link)
                 
-                # Score the image based on URL patterns
+                
                 score = 0
                 url_lower = image_url.lower()
                 
-                # Prefer images from reputable CDNs
+                
                 if any(cdn in url_lower for cdn in ['cdn', 'static', 'media', 'assets']):
                     score += 10
                 
-                # Prefer larger images (check URL for size indicators)
+                
                 if any(size in url_lower for size in ['large', 'full', 'original', 'high']):
                     score += 20
                 elif any(size in url_lower for size in ['thumb', 'small', 'medium']):
                     score -= 5
                 
-                # Prefer common image formats
+                
                 if any(ext in url_lower for ext in ['.jpg', '.jpeg', '.png', '.webp']):
                     score += 5
                 
@@ -302,11 +302,11 @@ class MultiSourceNewsFetcher:
         if not all_images:
             return None
         
-        # Sort by score and return the best one
+        
         all_images.sort(key=lambda x: x['score'], reverse=True)
         best_image = all_images[0]['url']
         
-        # Try to upgrade resolution
+        
         upgraded = self._upgrade_image_resolution(best_image)
         print(f"Selected image from {all_images[0]['source']}: {upgraded[:80]}...")
         
@@ -319,11 +319,11 @@ class MultiSourceNewsFetcher:
             response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
             
-            # Remove script and style elements
+            
             for script in soup(["script", "style", "nav", "header", "footer"]):
                 script.decompose()
             
-            # Try to find main content
+            
             content_selectors = [
                 'article',
                 '[role="main"]',
@@ -343,9 +343,9 @@ class MultiSourceNewsFetcher:
                 content = soup.find('body')
             
             if content:
-                # Get text and clean it
+                
                 text = content.get_text(separator=' ', strip=True)
-                # Limit length
+                
                 return text[:2000] if len(text) > 2000 else text
             
             return ''
@@ -363,7 +363,7 @@ class MultiSourceNewsFetcher:
         intersection = words1.intersection(words2)
         union = words1.union(words2)
         
-        # Jaccard similarity
+        
         return len(intersection) / len(union) if union else 0.0
     
     def _summarize_content(self, content: str, max_length: int = 150) -> str:
@@ -371,35 +371,35 @@ class MultiSourceNewsFetcher:
         if not content:
             return ""
         
-        # Remove HTML tags if present
+        
         try:
             soup = BeautifulSoup(content, 'html.parser')
             content = soup.get_text()
         except:
-            # If parsing fails, just use the content as-is
+            
             pass
         
-        # Remove extra whitespace
+        
         content = ' '.join(content.split())
         
-        # If content is very short, return as is (might be a short summary already)
+        
         if len(content) <= max_length:
             return content
         
-        # Try to find a good sentence break
+        
         sentences = re.split(r'[.!?]\s+', content)
         summary = ""
         
         for sentence in sentences:
             sentence = sentence.strip()
-            if not sentence or len(sentence) < 5:  # Skip very short sentences
+            if not sentence or len(sentence) < 5:  
                 continue
             if len(summary) + len(sentence) + 2 <= max_length:
                 summary += sentence + ". "
             else:
                 break
         
-        # If no good break found, just truncate at word boundary
+        
         if not summary or len(summary) < 15:
             words = content[:max_length].split()
             if len(words) > 1:
@@ -422,32 +422,32 @@ class MultiSourceNewsFetcher:
         
         print(f"Selecting best image from {len(images)} candidates using Gemini...")
         
-        # Upgrade all image URLs to higher resolution
+        
         scored_images = []
         for img_data in images:
             url = img_data.get('url', '')
             if not url:
                 continue
             
-            # Upgrade resolution
+            
             upgraded_url = self._upgrade_image_resolution(url)
             
-            # Score based on source reputation and URL patterns
+            
             score = 0
             url_lower = upgraded_url.lower()
             source = img_data.get('source', '').lower()
             
-            # Prefer images from reputable sources
+            
             if any(reputable in source for reputable in ['bbc', 'reuters', 'guardian', 'nytimes', 'cnn', 'npr']):
                 score += 10
             
-            # Prefer full-size images (check URL patterns)
+            
             if any(pattern in url_lower for pattern in ['/full/', '/original/', '/large/', '/high-res']):
                 score += 20
             elif any(pattern in url_lower for pattern in ['/thumb/', '/small/', '/medium/']):
                 score -= 10
             
-            # Prefer images without size parameters (likely full resolution)
+            
             if '?' not in upgraded_url or not re.search(r'[?&](w|width|h|height|s|size)=\d+', upgraded_url):
                 score += 15
             
@@ -458,12 +458,12 @@ class MultiSourceNewsFetcher:
                 'source': img_data.get('source', 'Unknown')
             })
         
-        # Sort by score (highest first)
+        
         scored_images.sort(key=lambda x: x['score'], reverse=True)
         
-        # Use Gemini to validate top candidates for relevance if available
+        
         if self.gemini_api_key and len(scored_images) > 0:
-            top_candidates = scored_images[:5]  # Check top 5 candidates
+            top_candidates = scored_images[:5]  
             validated_image = self._validate_image_relevance_with_gemini(
                 top_candidates, title, bullet_points
             )
@@ -471,7 +471,7 @@ class MultiSourceNewsFetcher:
                 print(f"✓ Selected image validated by Gemini: {validated_image[:80]}...")
                 return validated_image
         
-        # Return highest scored image if Gemini not available or validation failed
+        
         if scored_images:
             best = scored_images[0]
             print(f"✓ Selected best image from {best['source']}: {best['url'][:80]}...")
@@ -488,7 +488,7 @@ class MultiSourceNewsFetcher:
             import google.generativeai as genai
             genai.configure(api_key=self.gemini_api_key)
             
-            # Try to initialize model
+            
             model = None
             for model_name in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']:
                 try:
@@ -500,10 +500,10 @@ class MultiSourceNewsFetcher:
             if not model:
                 return None
             
-            # Prepare context
-            bullets_text = "\n".join([f"- {bp}" for bp in bullet_points[:5]])  # Use first 5 bullets
             
-            # Create prompt with image URLs
+            bullets_text = "\n".join([f"- {bp}" for bp in bullet_points[:5]])  
+            
+            
             image_list = "\n".join([f"{i+1}. {c['url']} (from {c['source']})" for i, c in enumerate(image_candidates)])
             
             prompt = f"""You are analyzing news article images to determine which one is most relevant, appropriate, and high-quality for the story.
@@ -529,7 +529,7 @@ Best image number:"""
             response = model.generate_content(prompt)
             result = response.text.strip()
             
-            # Extract number from response
+            
             match = re.search(r'\b([1-9]|10)\b', result)
             if match:
                 idx = int(match.group(1)) - 1
@@ -555,18 +555,18 @@ Best image number:"""
             
             genai.configure(api_key=self.gemini_api_key)
             
-            # Try to list available models first (for debugging)
+            
             try:
                 models = genai.list_models()
                 available_models = []
                 for m in models:
                     if 'generateContent' in m.supported_generation_methods:
-                        # Extract just the model name (remove 'models/' prefix if present)
+                        
                         model_name = m.name.replace('models/', '') if m.name.startswith('models/') else m.name
                         available_models.append(model_name)
-                print(f"Available Gemini models: {available_models[:10]}")  # Show first 10
+                print(f"Available Gemini models: {available_models[:10]}")  
                 if available_models:
-                    # Use the first available model if our preferred ones don't work
+                    
                     preferred_models = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
                     for pref in preferred_models:
                         if any(pref in m for m in available_models):
@@ -574,19 +574,19 @@ Best image number:"""
             except Exception as list_error:
                 print(f"Could not list models: {list_error}")
             
-            # Use the newer model names - try gemini-2.5-flash first (newest), then gemini-2.0-flash
-            # These are the models that are actually available according to the API
+            
+            
             model = None
             model_name = None
             
-            # Try models in order of preference (newest first)
+            
             preferred_models = [
-                'gemini-2.5-flash',      # Newest, fastest
-                'gemini-2.0-flash',      # Stable newer version
-                'gemini-2.5-pro',        # More capable but slower
-                'gemini-1.5-flash',      # Older but might work
-                'gemini-1.5-pro',        # Older but might work
-                'gemini-pro'              # Oldest fallback
+                'gemini-2.5-flash',      
+                'gemini-2.0-flash',      
+                'gemini-2.5-pro',        
+                'gemini-1.5-flash',      
+                'gemini-1.5-pro',        
+                'gemini-pro'              
             ]
             
             for model_name in preferred_models:
@@ -602,12 +602,12 @@ Best image number:"""
                 print("✗ Could not initialize any Gemini model")
                 return []
             
-            # Prepare source content for Gemini
+            
             sources_text = ""
             for i, source in enumerate(source_summaries, 1):
                 source_name = source.get('source', 'Unknown')
                 summary = source.get('summary', '')
-                # Clean HTML tags
+                
                 soup = BeautifulSoup(summary, 'html.parser')
                 clean_summary = ' '.join(soup.get_text().split())
                 sources_text += f"\n\nSource {i} ({source_name}):\n{clean_summary}"
@@ -644,33 +644,33 @@ Bullet points:"""
             response = model.generate_content(prompt)
             bullets_text = response.text.strip()
             
-            # Parse bullet points (they should be numbered)
+            
             bullets = []
             lines = bullets_text.split('\n')
             for line in lines:
                 line = line.strip()
                 if not line:
                     continue
-                # Remove numbering (1., 2., etc.) and clean up
+                
                 cleaned = re.sub(r'^\d+[\.\)]\s*', '', line)
-                # Remove markdown formatting (**bold**, *italic*, etc.)
-                cleaned = re.sub(r'\*\*([^*]+)\*\*', r'\1', cleaned)  # Remove **bold**
-                cleaned = re.sub(r'\*([^*]+)\*', r'\1', cleaned)  # Remove *italic*
-                cleaned = re.sub(r'__([^_]+)__', r'\1', cleaned)  # Remove __bold__
-                cleaned = re.sub(r'_([^_]+)_', r'\1', cleaned)  # Remove _italic_
-                # Remove any "(2nd picture)", "(picture)", or similar text patterns
+                
+                cleaned = re.sub(r'\*\*([^*]+)\*\*', r'\1', cleaned)  
+                cleaned = re.sub(r'\*([^*]+)\*', r'\1', cleaned)  
+                cleaned = re.sub(r'__([^_]+)__', r'\1', cleaned)  
+                cleaned = re.sub(r'_([^_]+)_', r'\1', cleaned)  
+                
                 cleaned = re.sub(r'\s*\([^)]*(?:picture|image|photo|img)[^)]*\)\s*', '', cleaned, flags=re.IGNORECASE)
-                # Remove any remaining parenthetical references to images
-                cleaned = re.sub(r'\s*\([^)]*\d+[^)]*\)\s*$', '', cleaned)  # Remove trailing (2nd), (3rd), etc.
-                # Remove any markdown headers (# Header)
+                
+                cleaned = re.sub(r'\s*\([^)]*\d+[^)]*\)\s*$', '', cleaned)  
+                
                 cleaned = re.sub(r'^#+\s*', '', cleaned)
                 cleaned = cleaned.strip()
-                if cleaned and len(cleaned) > 30:  # At least 30 characters
+                if cleaned and len(cleaned) > 30:  
                     bullets.append(cleaned)
             
             if bullets:
                 print(f"✓ Generated {len(bullets)} bullet points using Gemini")
-                return bullets[:7]  # Limit to 7 max
+                return bullets[:7]  
             else:
                 print("✗ Gemini returned no valid bullet points")
                 return []
@@ -689,13 +689,13 @@ Bullet points:"""
         if not source_summaries:
             return []
         
-        # Try Gemini first if API key is available
+        
         if self.gemini_api_key:
             gemini_bullets = self._generate_bullets_with_gemini(source_summaries, title)
             if gemini_bullets:
                 return gemini_bullets
         
-        # Fallback to basic extraction
+        
         print("Using fallback bullet extraction method")
         combined_texts = []
         for source in source_summaries:
@@ -783,7 +783,7 @@ Bullet points:"""
                     group.append(article2)
                     used.add(j)
             
-            if len(group) >= 2:  # Only return groups with at least 2 sources
+            if len(group) >= 2:  
                 groups.append(group)
         
         return groups
@@ -809,19 +809,19 @@ Bullet points:"""
         
         print(f"Found {len(groups)} story groups, checking which are new...")
         
-        # Analyze each group to see if it's new and how many sources cover it
+        
         available_stories = []
         for group in groups:
             main_title = group[0].get('title', '')
             source_count = len(set(a.get('source', 'Unknown') for a in group))
             
-            # Check if this story is similar to existing ones
+            
             is_new = True
             max_similarity = 0.0
             for excluded_title in exclude_titles:
                 similarity = self._calculate_similarity(main_title, excluded_title)
                 max_similarity = max(max_similarity, similarity)
-                if similarity > 0.5:  # 50% similarity threshold - more lenient
+                if similarity > 0.5:  
                     is_new = False
                     break
             
@@ -839,7 +839,7 @@ Bullet points:"""
                 else:
                     print(f"  ✗ SKIP: '{main_title[:60]}...' (only {source_count} sources)")
         
-        # Sort by source count (most sources first), then by lowest similarity to existing
+        
         available_stories.sort(key=lambda x: (-x['source_count'], x['max_similarity']))
         
         print(f"\nPhase 1 complete: Found {len(available_stories)} new stories covered by multiple sources")
@@ -850,7 +850,7 @@ Bullet points:"""
         if exclude_titles is None:
             exclude_titles = []
         
-        # Phase 1: Analyze which stories are available
+        
         available_stories = self.analyze_available_stories(exclude_titles)
         
         if not available_stories:
@@ -860,34 +860,34 @@ Bullet points:"""
         print(f"\nPhase 2: Fetching details for best story...")
         print(f"Selected: '{available_stories[0]['title'][:60]}...' ({available_stories[0]['source_count']} sources)")
         
-        # Phase 2: Try to fetch the selected story, or try next best ones if it fails
-        for story_idx, selected_story in enumerate(available_stories[:5]):  # Try up to 5 best stories
+        
+        for story_idx, selected_story in enumerate(available_stories[:5]):  
             current_group = selected_story['group']
             print(f"\nTrying story {story_idx + 1}: '{selected_story['title'][:60]}...'")
             
-            # Create aggregated article
+            
             main_article = current_group[0]
             
-            # Collect summaries from all sources
+            
             source_summaries = []
             images = []
-            seen_sources = set()  # Avoid duplicate sources
+            seen_sources = set()  
             
             for article in current_group:
                 source_name = article.get('source', 'Unknown')
-                # Skip if we already have this source
+                
                 if source_name in seen_sources:
                     continue
                 seen_sources.add(source_name)
                 
-                # Get summary from various possible fields
+                
                 summary = (article.get('summary', '') or 
                           article.get('description', '') or 
                           article.get('content', '') or
                           article.get('title', ''))
                 
-                if summary and len(summary.strip()) > 10:  # At least 10 characters
-                    # Clean and summarize
+                if summary and len(summary.strip()) > 10:  
+                    
                     summarized = self._summarize_content(summary, max_length=200)
                     if summarized and len(summarized.strip()) > 10:
                         source_summaries.append({
@@ -903,7 +903,7 @@ Bullet points:"""
                 
                 if article.get('image'):
                     img_url = article['image']
-                    # Make URL absolute if it's relative
+                    
                     article_url = article.get('link', '')
                     if article_url:
                         img_url = self._make_absolute_url(img_url, article_url)
@@ -916,50 +916,50 @@ Bullet points:"""
             
             print(f"Total sources with valid summaries: {len(source_summaries)}")
             
-            # If we have enough summaries, use this story
+            
             if len(source_summaries) >= 2:
                 print(f"✓ Successfully extracted {len(source_summaries)} summaries")
                 break
             else:
                 print(f"✗ Story {story_idx + 1} failed: only {len(source_summaries)} valid summaries, trying next...")
-                source_summaries = []  # Reset for next iteration
+                source_summaries = []  
                 continue
         
-        # Check if we found a valid story
+        
         if len(source_summaries) < 2:
             print(f"✗ Could not find any story with at least 2 valid summaries after trying {min(5, len(available_stories))} stories")
             return None
         
-        # We found a valid group, now extract bullet points
+        
         print(f"Successfully found story with {len(source_summaries)} sources")
         
-        # Get title for Gemini context
+        
         article_title = main_article.get('title', 'Breaking News')
         
-        # Extract generalized bullet points from all sources (using Gemini if available)
+        
         bullet_points = self._extract_generalized_bullets(source_summaries, max_bullets=7, title=article_title)
         
         if not bullet_points or len(bullet_points) < 2:
             print("Could not extract enough bullet points")
             return None
         
-        # Store both bullet points and source info
+        
         data_to_store = {
             'bullets': bullet_points,
             'sources': [{'source': s['source'], 'url': s['url']} for s in source_summaries]
         }
         
-        # Get reliable image from RSS feeds (simple approach, avoids 403 errors)
+        
         main_image = self._get_reliable_image_for_article(current_group) if current_group else None
         
-        # Use the title from the main article
+        
         title = main_article.get('title', 'Breaking News')
         if not title or len(title.strip()) < 10:
             title = f"News Story from {len(source_summaries)} Sources"
         
         return {
             'title': title,
-            'content': json.dumps(data_to_store),  # Store bullets and source info as JSON
+            'content': json.dumps(data_to_store),  
             'summary': f"Coverage from {len(source_summaries)} sources",
             'photo': main_image,
             'source_url': main_article.get('link', ''),

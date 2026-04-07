@@ -17,7 +17,7 @@ def init_oauth(app):
     """Initialize OAuth with Google"""
     oauth.init_app(app)
     
-    # Set redirect URI to always use localhost (matches Google Console)
+    
     redirect_uri = "http://localhost:5000/callback/google"
     
     oauth.register(
@@ -28,7 +28,7 @@ def init_oauth(app):
         client_kwargs={
             'scope': 'openid email profile'
         },
-        # Set redirect_uri at registration level for consistency
+        
         redirect_uri=redirect_uri
     )
 
@@ -71,7 +71,7 @@ def login():
     if request.method == "POST":
         identifier = request.form.get("identifier", "").strip()
         password = request.form.get("password", "")
-        # Try lookup by email first, then by username
+        
         user = User.query.filter_by(email=identifier.lower()).first()
         if user is None:
             user = User.query.filter_by(username=identifier).first()
@@ -91,8 +91,8 @@ def google_login():
         flash("Google login is not configured.", "danger")
         return redirect(url_for("auth.login"))
     
-    # Use the redirect_uri from OAuth registration (always localhost:5000)
-    # This ensures consistency with Google Console and callback
+    
+    
     redirect_uri = "http://localhost:5000/callback/google"
     
     print(f"Starting OAuth flow with redirect_uri: {redirect_uri}")
@@ -114,24 +114,24 @@ def google_callback():
         print(f"Session ID: {session.get('_id', 'No session ID')}")
         print(f"State in request: {request.args.get('state', 'No state')}")
         
-        # Authlib should automatically use the same redirect_uri from authorize_redirect
-        # But we need to ensure the request URL matches what was used in authorize
-        # Get the authorization token (Authlib handles state and redirect_uri automatically)
+        
+        
+        
         token = oauth.google.authorize_access_token()
         print(f"Token received: {bool(token)}")
         
-        # Clean up session
+        
         session.pop('oauth_redirect_uri', None)
         
-        # Get user info - Authlib should handle this automatically
+        
         user_info = None
         
-        # Method 1: Check if userinfo is already in token (some providers include it)
+        
         if token and 'userinfo' in token:
             user_info = token.get('userinfo')
             print("User info from token")
         else:
-            # Method 2: Fetch from userinfo endpoint (standard OAuth flow)
+            
             try:
                 resp = oauth.google.get('userinfo', token=token)
                 if resp and resp.status_code == 200:
@@ -153,14 +153,14 @@ def google_callback():
         
         google_id = user_info.get('sub')
         email = user_info.get('email')
-        # Try multiple fields for name
+        
         name = (user_info.get('name') or 
                 user_info.get('given_name') or 
                 user_info.get('displayName') or
                 (email.split('@')[0] if email else 'User'))
         picture = user_info.get('picture')
         
-        # Ensure name is not empty
+        
         if not name or not name.strip():
             name = email.split('@')[0] if email else 'User'
         
@@ -171,7 +171,7 @@ def google_callback():
             flash("Failed to get user information from Google.", "danger")
             return redirect(url_for("auth.login"))
         
-        # Create or get user
+        
         try:
             print(f"Attempting to create/get user with google_id={google_id}, email={email}, name={name}")
             user = User.create_google_user(google_id, email, name, picture)

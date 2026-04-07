@@ -11,7 +11,7 @@
   </div>
   
   <div class="row">
-    <!-- Sidebar Filters -->
+    
     <div class="col-lg-2 col-xl-2 mb-4 mb-lg-0">
       <div class="card filter-sidebar" style="position: sticky; top: 80px;">
         <div class="card-header">
@@ -19,7 +19,7 @@
         </div>
         <div class="card-body p-2">
           <div class="accordion accordion-flush" id="filterAccordion">
-            <!-- Countries Filter -->
+            
             <div class="accordion-item border-0">
               <h2 class="accordion-header" id="headingCountries">
                 <button class="accordion-button collapsed py-2 px-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseCountries" aria-expanded="false" aria-controls="collapseCountries">
@@ -70,7 +70,7 @@
               </div>
             </div>
             
-            <!-- News Type Filter -->
+            
             <div class="accordion-item border-0">
               <h2 class="accordion-header" id="headingType">
                 <button class="accordion-button collapsed py-2 px-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapseType" aria-expanded="false" aria-controls="collapseType">
@@ -117,7 +117,7 @@
               </div>
             </div>
             
-            <!-- Clear Filter -->
+            
             {% if current_filter %}
             <div class="pt-2 border-top">
               <a href="{{ url_for('list_articles') }}" class="filter-link-clear">
@@ -130,7 +130,7 @@
       </div>
     </div>
     
-    <!-- Main Content -->
+    
     <div class="col-lg-10 col-xl-10">
       {% if current_search %}
       <div class="alert alert-info mb-3">
@@ -184,7 +184,7 @@
               </p>
               
               {% if current_user.is_authenticated %}
-              <div class="mt-auto">
+              <div class="mt-auto pt-2">
                 <a href="{{ url_for('article_detail', article_id=article.id) }}" class="btn btn-primary btn-sm">
                   Read More →
                 </a>
@@ -203,9 +203,11 @@
                 </span>
               </div>
               {% else %}
-              <a href="{{ url_for('article_detail', article_id=article.id) }}" class="btn btn-primary btn-sm mt-2">
-                Read More →
-              </a>
+              <div class="mt-auto pt-2">
+                <a href="{{ url_for('article_detail', article_id=article.id) }}" class="btn btn-primary btn-sm">
+                  Read More →
+                </a>
+              </div>
               {% endif %}
             </div>
           </div>
@@ -249,5 +251,4 @@
   {% endif %}
 </div>
 {% endblock %}
-
 

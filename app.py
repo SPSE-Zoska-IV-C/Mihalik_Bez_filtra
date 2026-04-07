@@ -12,8 +12,8 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Prefer DATABASE_URL (e.g. for Vercel/production). Only create a local
-# writable instance folder when we actually use SQLite (local dev).
+
+
 database_url = os.getenv("DATABASE_URL")
 if database_url:
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
@@ -84,8 +84,8 @@ with app.app_context():
             existing = {c[1] for c in cols}
             if 'parent_id' not in existing:
                 db.session.execute(_sql_text("ALTER TABLE discussion_comment ADD COLUMN parent_id INTEGER"))
-                # SQLite needs manual FK creation; we'll skip the constraint but
-                # at least have the column
+                
+                
                 db.session.commit()
         except Exception:
             pass
@@ -100,11 +100,11 @@ with app.app_context():
             if 'google_id' not in existing:
                 db.session.execute(_sql_text("ALTER TABLE user ADD COLUMN google_id VARCHAR(255)"))
                 db.session.commit()
-            # Make password_hash nullable for OAuth users
-            # SQLite doesn't support ALTER COLUMN, so we need to recreate table
+            
+            
             password_hash_not_null = False
             for col in cols:
-                if col[1] == 'password_hash' and col[3] == 0:  # 0 means NOT NULL
+                if col[1] == 'password_hash' and col[3] == 0:  
                     password_hash_not_null = True
                     break
             
@@ -143,7 +143,7 @@ with app.app_context():
         ).first()
         if not result:
             _upgrade()
-            # After creating schema on a fresh DB, ensure colum-ns exist too
+            
             _ensure_article_columns()
             _ensure_user_columns()
         else:
@@ -166,7 +166,7 @@ with app.app_context():
             _ensure_comment_columns()
             _ensure_discussion_comment_columns()
 
-    # ensure the discussion_comment table exists too
+    
     db.create_all()
 
 @app.get("/")
@@ -183,7 +183,7 @@ def extract_location_with_gemini(title: str, content: str, summary: str = "") ->
         import google.generativeai as genai
         genai.configure(api_key=gemini_key)
         
-        # Try to find available model
+        
         model = None
         for model_name in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-1.5-flash']:
             try:
@@ -195,11 +195,11 @@ def extract_location_with_gemini(title: str, content: str, summary: str = "") ->
         if not model:
             return {"latitude": None, "longitude": None, "location_name": None}
         
-        # Prepare content for analysis
+        
         article_text = f"Title: {title}\n\n"
         if summary:
             article_text += f"Summary: {summary}\n\n"
-        article_text += f"Content: {content[:2000]}"  # Limit content length
+        article_text += f"Content: {content[:2000]}"  
         
         prompt = f"""Analyze this news article and determine the primary geographic location where the event occurred or is most relevant.
 
@@ -228,11 +228,11 @@ JSON response:"""
         response = model.generate_content(prompt)
         response_text = response.text.strip()
         
-        # Try to extract JSON from response
+        
         import json
         import re
         
-        # Remove markdown code blocks if present
+        
         response_text = re.sub(r'```json\s*', '', response_text)
         response_text = re.sub(r'```\s*', '', response_text)
         response_text = response_text.strip()
@@ -245,7 +245,7 @@ JSON response:"""
                 "location_name": location_data.get("location_name")
             }
         except json.JSONDecodeError:
-            # Try to extract location name from text response
+            
             location_name_match = re.search(r'"location_name":\s*"([^"]+)"', response_text)
             if location_name_match:
                 return {
@@ -299,7 +299,7 @@ def map():
 @app.get("/api/articles/with-location")
 def get_articles_with_location():
     """API endpoint to get articles with location data for map (only articles from last 24 hours)"""
-    # Calculate cutoff time (24 hours ago)
+    
     cutoff_time = datetime.utcnow() - timedelta(hours=24)
     
     articles = Article.query.filter(
@@ -335,7 +335,7 @@ def list_articles():
     
     articles = Article.query.order_by(Article.date_posted.desc()).all()
     
-    # Apply search query if specified (from navbar search bar)
+    
     if search_query:
         filtered_articles = []
         for article in articles:
@@ -348,7 +348,7 @@ def list_articles():
                 filtered_articles.append(article)
         articles = filtered_articles
     
-    # Apply filter if specified (from filter buttons)
+    
     if filter_keyword:
         filtered_articles = []
         for article in articles:
@@ -397,23 +397,23 @@ def discussions():
 
     if article:
         discussions = Discussion.query.filter_by(article_id=article.id).order_by(Discussion.date_created.desc()).all()
-        # when filtering we simply render the flat list and pass the
-        # selected article so the template can show a header.
+        
+        
         return render_template("discussions.html", discussions=discussions, article=article)
 
-    # otherwise fetch everything and group by linked article
+    
     all_discussions = Discussion.query.order_by(Discussion.date_created.desc()).all()
     groups = {}
     for d in all_discussions:
-        key = d.article  # None for general discussion
+        key = d.article  
         groups.setdefault(key, []).append(d)
 
-    # convert to list of pairs so Jinja preserves order
+    
     grouped_list = []
-    # general first
+    
     if None in groups:
         grouped_list.append((None, groups.pop(None)))
-    # then any article‑specific groups in descending date order of first item
+    
     for art, ds in groups.items():
         grouped_list.append((art, ds))
 
@@ -463,7 +463,7 @@ def delete_discussion(discussion_id: int):
         flash("You are not allowed to delete that discussion.", "danger")
         return redirect(url_for("discussion_detail", discussion_id=discussion.id))
 
-    # delete cascades to comments via relationship
+    
     db.session.delete(discussion)
     db.session.commit()
     flash("Discussion deleted.", "success")
@@ -474,13 +474,13 @@ def delete_discussion(discussion_id: int):
 def discussion_detail(discussion_id: int):
     """Show a single discussion with its comments, organised into a tree."""
     discussion = Discussion.query.get_or_404(discussion_id)
-    # fetch all comments and then build a parent/child structure just like
-    # we do for articles.
+    
+    
     all_comments = DiscussionComment.query.filter_by(
         discussion_id=discussion.id
     ).order_by(DiscussionComment.date_posted.asc()).all()
 
-    # map id -> comment
+    
     comments_dict = {c.id: c for c in all_comments}
     for c in all_comments:
         if c.parent_id and c.parent_id in comments_dict:
@@ -509,7 +509,7 @@ def add_discussion_comment(discussion_id: int):
     """
     discussion = Discussion.query.get_or_404(discussion_id)
 
-    # support both form-encoded and JSON bodies for AJAX
+    
     if request.is_json:
         data = request.get_json()
         content = (data.get("content", "") or "").strip()
@@ -561,7 +561,7 @@ def fetch_article():
         traceback.print_exc()
         multi_source_fetcher = None
 
-    # Get list of existing article titles to avoid fetching the same story
+    
     existing_titles = [a.title for a in Article.query.with_entities(Article.title).all()]
     
     data = None
@@ -579,12 +579,12 @@ def fetch_article():
         flash("Could not fetch an article right now. Please try again shortly.", "warning")
         return redirect(url_for("list_articles"))
 
-    # Check for duplicate by title only
+    
     existing = Article.query.filter(Article.title == data['title']).first()
     
     if not existing:
         try:
-            # Ensure title and summary are not too long
+            
             title = data['title'][:200] if len(data['title']) > 200 else data['title']
             summary = data.get('summary', '')[:500] if len(data.get('summary', '')) > 500 else data.get('summary', '')
             source_url = data.get('source_url', '')[:500] if len(data.get('source_url', '')) > 500 else data.get('source_url', '')
@@ -592,11 +592,11 @@ def fetch_article():
             if photo and len(photo) > 500:
                 photo = photo[:500]
             
-            # Extract location using Gemini
+            
             print("Extracting location from article...")
             location_data = extract_location_with_gemini(title, data['content'], summary)
             
-            # If we have location name but no coordinates, try to geocode it
+            
             if location_data.get("location_name") and not location_data.get("latitude"):
                 print(f"Geocoding location: {location_data['location_name']}")
                 geocode_result = geocode_location(location_data["location_name"])
@@ -605,7 +605,7 @@ def fetch_article():
             
             article = Article(
                 title=title,
-                content=data['content'],  # JSON string with sources
+                content=data['content'],  
                 summary=summary,
                 photo=photo,
                 source_url=source_url,
@@ -622,7 +622,7 @@ def fetch_article():
                 print(f"Location: {location_data['location_name']} ({location_data.get('latitude')}, {location_data.get('longitude')})")
             flash(f"Article '{article.title}' fetched successfully!", "success")
 
-            # Keep only latest 50 articles
+            
             ids = [a.id for a in Article.query.order_by(Article.date_posted.desc()).all()]
             if len(ids) > 50:
                 to_delete = ids[50:]
@@ -665,21 +665,21 @@ def article_detail(article_id):
             article_id=article_id, user_id=current_user.id
         ).first()
     
-    # pocet lajkov
+    
     like_count = ArticleReaction.query.filter_by(
         article_id=article_id, liked=True
     ).count()
     
-    # Get top-level comments (no parent) ordered by date, then load replies
+    
     top_level_comments = Comment.query.filter_by(
         article_id=article_id, 
         parent_id=None
     ).order_by(Comment.date_posted.asc()).all()
     
-    # Get all comments with replies for this article
+    
     all_comments = Comment.query.filter_by(article_id=article_id).order_by(Comment.date_posted.asc()).all()
     
-    # Build comment tree
+    
     comments_dict = {c.id: c for c in all_comments}
     for comment in all_comments:
         if comment.parent_id and comment.parent_id in comments_dict:

@@ -12,8 +12,8 @@ class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=True)  # Nullable for OAuth users
-    google_id = db.Column(db.String(255), unique=True, nullable=True)  # Google OAuth ID
+    password_hash = db.Column(db.String(128), nullable=True)  
+    google_id = db.Column(db.String(255), unique=True, nullable=True)  
     is_admin = db.Column(db.Boolean, default=False, nullable=False)
     date_created = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     profile_image = db.Column(db.String(500))
@@ -32,21 +32,21 @@ class User(db.Model, UserMixin):
     def create_google_user(google_id: str, email: str, name: str, picture: str = None):
         """Create or get user from Google OAuth"""
         try:
-            # First, try to find user by google_id
+            
             user = User.query.filter_by(google_id=google_id).first()
             
             if user:
-                # User exists with this google_id, update profile image if needed
+                
                 if picture and not user.profile_image:
                     user.profile_image = picture
                 db.session.commit()
                 return user
             
-            # Check if email already exists (user might have registered with email/password)
+            
             user = User.query.filter_by(email=email).first()
             if user:
-                # Link Google account to existing user
-                # Check if google_id is already taken by another user
+                
+                
                 existing_google_user = User.query.filter_by(google_id=google_id).first()
                 if existing_google_user and existing_google_user.id != user.id:
                     raise ValueError(f"Google ID {google_id} is already linked to another account")
@@ -57,29 +57,29 @@ class User(db.Model, UserMixin):
                 db.session.commit()
                 return user
             
-            # Create new user
-            # Generate username from name
+            
+            
             username = name.lower().replace(' ', '_').replace('.', '_').replace('-', '_')[:80]
-            # Remove any invalid characters
+            
             username = ''.join(c for c in username if c.isalnum() or c == '_')
             if not username:
-                # Fallback to email prefix if name is invalid
+                
                 username = email.split('@')[0].lower()[:80]
             
-            # Ensure username is unique
+            
             base_username = username
             counter = 1
             while User.query.filter_by(username=username).first():
                 username = f"{base_username}_{counter}"[:80]
                 counter += 1
-                if counter > 1000:  # Safety limit
+                if counter > 1000:  
                     raise ValueError("Could not generate unique username")
             
             user = User(
                 username=username,
                 email=email,
                 google_id=google_id,
-                password_hash=None,  # No password for OAuth users
+                password_hash=None,  
                 profile_image=picture
             )
             db.session.add(user)
@@ -112,10 +112,10 @@ class Article(db.Model):
     source_url = db.Column(db.String(500))
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
-    # Geolocation fields
+    
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
-    location_name = db.Column(db.String(200), nullable=True)  # Human-readable location name
+    location_name = db.Column(db.String(200), nullable=True)  
     
     reactions = db.relationship("ArticleReaction", backref="article", lazy=True, cascade="all, delete-orphan")
     comments = db.relationship("Comment", back_populates="article", lazy=True, cascade="all, delete-orphan")
@@ -169,7 +169,7 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     content = db.Column(db.Text, nullable=False)
     date_posted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    parent_id = db.Column(db.Integer, db.ForeignKey("comment.id"), nullable=True)  # For replies
+    parent_id = db.Column(db.Integer, db.ForeignKey("comment.id"), nullable=True)  
     
     article = db.relationship("Article", back_populates="comments", lazy=True)
     author = db.relationship("User", backref="comments", lazy=True)
@@ -191,7 +191,7 @@ class Discussion(db.Model):
     question = db.Column(db.Text, nullable=False)
     date_created = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     
-    # Optional link to an article
+    
     article_id = db.Column(db.Integer, db.ForeignKey("article.id"), nullable=True)
     user_id = db.Column(db.Integer, db.ForeignKey("user.id"), nullable=False)
     

@@ -77,7 +77,6 @@
 
 {% if current_user.is_authenticated %}
 <script>
-  // submit new discussion comment via AJAX so page doesn't jump
   const discussionForm = document.querySelector('#commentForm');
   if (discussionForm) {
     discussionForm.addEventListener('submit', function(e) {
@@ -115,8 +114,6 @@
       });
     });
   }
-
-  // reply functionality (identical to article version)
   let currentReplyParent = null;
   function showReplyForm(commentId, authorName) {
     document.querySelectorAll('.reply-form-container').forEach(form => {

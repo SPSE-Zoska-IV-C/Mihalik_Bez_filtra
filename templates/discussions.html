@@ -20,9 +20,7 @@
   </div>
   {% endif %}
 
-  {# if the view provided a `groups` variable we are not
-     filtering; render each category separately. otherwise fall back to
-     the old behaviour which expects a flat `discussions` list #}
+  
   {% if groups is defined %}
     {% for art, ds in groups %}
       <h4 class="discussion-group-title">

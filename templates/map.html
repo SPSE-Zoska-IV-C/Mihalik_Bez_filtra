@@ -39,7 +39,7 @@
         padding: 0.5rem;
     }
     
-    /* Leaflet popup styling */
+    
     .leaflet-popup-content-wrapper {
         background: var(--card) !important;
         color: var(--fg) !important;
@@ -169,33 +169,23 @@
 <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
 <script>
-    // Wait for DOM to be fully loaded
     document.addEventListener('DOMContentLoaded', function() {
-        // Initialize map centered on world
         var map = L.map('map', {
             center: [20, 0],
             zoom: 2,
             zoomControl: true
         });
-
-        // Add tile layer with dark mode support
         var isDark = document.body.dataset.theme === 'dark';
-        
-        // Use OpenStreetMap as default (more reliable)
         var tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
         var attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
-        
-        // Try dark tiles if in dark mode, but fallback to OSM if it fails
         if (isDark) {
             try {
-                // Try CartoDB dark tiles
                 var darkLayer = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
                     maxZoom: 19,
                     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
                     subdomains: 'abcd'
                 });
                 darkLayer.addTo(map);
-                // Test if tiles load, if not use OSM
                 darkLayer.on('tileerror', function() {
                     console.log('Dark tiles failed, using OSM');
                     map.removeLayer(darkLayer);
@@ -205,7 +195,6 @@
                     }).addTo(map);
                 });
             } catch (e) {
-                // Fallback to OSM
                 L.tileLayer(tileUrl, {
                     maxZoom: 19,
                     attribution: attribution
@@ -217,8 +206,6 @@
                 attribution: attribution
             }).addTo(map);
         }
-        
-        // Force map to invalidate size after a short delay to ensure it renders
         setTimeout(function() {
             map.invalidateSize();
         }, 100);
@@ -229,16 +216,12 @@
             showCoverageOnHover: false,
             zoomToBoundsOnClick: true
         });
-
-        // Custom icon for news markers
         var newsIcon = L.divIcon({
             className: 'news-marker',
             html: '<div style="background: #0ea5e9; width: 30px; height: 30px; border-radius: 50%; border: 3px solid white; box-shadow: 0 2px 8px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; color: #051225; font-weight: bold; font-size: 14px;">📰</div>',
             iconSize: [30, 30],
             iconAnchor: [15, 15]
         });
-
-        // Fetch articles with location
         fetch('/api/articles/with-location')
         .then(response => response.json())
         .then(articles => {
@@ -246,7 +229,6 @@
             
             articles.forEach(article => {
                 if (article.latitude && article.longitude) {
-                    // Create popup content
                     var popupContent = `
                         <div class="article-popup">
                             ${article.photo ? `<img src="${article.photo}" alt="${article.title}" onerror="this.style.display='none'">` : ''}
@@ -258,8 +240,6 @@
                             <a href="/article/${article.id}" class="read-more-btn">Read Full Article →</a>
                         </div>
                     `;
-                    
-                    // Create marker
                     var marker = L.marker(
                         [article.latitude, article.longitude],
                         { icon: newsIcon }
@@ -268,11 +248,7 @@
                     markers.addLayer(marker);
                 }
             });
-            
-            // Add markers to map
             map.addLayer(markers);
-            
-            // Fit map to show all markers if there are any
             if (articles.length > 0) {
                 var bounds = markers.getBounds();
                 if (bounds.isValid()) {
@@ -283,23 +259,17 @@
         .catch(error => {
             console.error('Error loading articles:', error);
         });
-
-        // Update map theme when theme changes
         var observer = new MutationObserver(function(mutations) {
             mutations.forEach(function(mutation) {
                 if (mutation.type === 'attributes' && mutation.attributeName === 'data-theme') {
                     var isDark = document.body.dataset.theme === 'dark';
                     var center = map.getCenter();
                     var zoom = map.getZoom();
-                    
-                    // Remove all layers
                     map.eachLayer(function(layer) {
                         if (layer instanceof L.TileLayer) {
                             map.removeLayer(layer);
                         }
                     });
-                    
-                    // Add appropriate tile layer
                     var tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
                     var attribution = '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors';
                     

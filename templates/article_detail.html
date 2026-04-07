@@ -2,7 +2,7 @@
 {% block content %}
   <div class="row">
     <div class="col-lg-8 mx-auto">
-      <!-- Article Card -->
+      
       <div class="card mb-4">
         <img 
           src="{{ article.cover_image_url(960, 480) }}" 
@@ -26,7 +26,7 @@
           {% set sources_data = article.get_sources() %}
           {% if sources_data %}
             {% if 'bullets' in sources_data %}
-            <!-- Multi-source bullet board (new format) -->
+            
             <div class="multi-source-content mb-4">
               <h5 class="mb-3">
                 <span class="badge bg-info me-2">{{ sources_data.sources|length }} Sources</span>
@@ -51,7 +51,7 @@
               </div>
             </div>
             {% else %}
-            <!-- Multi-source bullet board (old format - fallback) -->
+            
             <div class="multi-source-content mb-4">
               <h5 class="mb-3">
                 <span class="badge bg-info me-2">{{ sources_data|length }} Sources</span>
@@ -79,7 +79,7 @@
             </div>
             {% endif %}
           {% else %}
-          <!-- Single source or regular content -->
+          
           <div class="card-text" style="white-space: pre-wrap; line-height: 1.6;">{{ article.content }}</div>
           {% if article.source_url %}
           <a href="{{ article.source_url }}" class="btn btn-outline-secondary mt-3" target="_blank" rel="noopener">Read full article</a>
@@ -103,7 +103,7 @@
         </div>
       </div>
 
-      <!-- Comments Section -->
+      
       <div class="card">
         <div class="card-body">
           <div class="d-flex justify-content-between align-items-center mb-2">
@@ -121,7 +121,7 @@
           </div>
           
           {% if current_user.is_authenticated %}
-          <!-- Comment Form -->
+          
           <div class="mb-4">
             <form id="commentForm">
               <div class="mb-3">
@@ -134,7 +134,7 @@
           <hr>
           {% endif %}
 
-          <!-- Comments List -->
+          
           <div id="commentsList" class="article-comments">
             {% if comments %}
               {% for comment in comments %}
@@ -148,7 +148,7 @@
         </div>
       </div>
 
-      <!-- Back to Articles -->
+      
       <div class="mt-3">
         <a href="{{ url_for('list_articles') }}" class="btn btn-secondary">← Back to Articles</a>
       </div>
@@ -182,8 +182,6 @@
       })
       .catch(error => console.error('Error:', error));
     }
-
-    // Handle comment form submission
     document.getElementById('commentForm').addEventListener('submit', function(e) {
       e.preventDefault();
       const content = document.getElementById('commentText').value.trim();
@@ -205,15 +203,12 @@
       .then(response => response.json())
       .then(data => {
         if (data.success) {
-          // Add new comment to the list
           const commentsList = document.getElementById('commentsList');
           const isEmpty = commentsList.querySelector('p.text-muted');
           
           if (isEmpty) {
             commentsList.innerHTML = '';
           }
-          
-          // Reload page to show new comment with proper nesting
           location.reload();
         }
         formBtn.disabled = false;
@@ -226,17 +221,12 @@
         alert('Failed to post comment. Please try again.');
       });
     });
-
-    // Reply functionality
     let currentReplyParent = null;
     
     function showReplyForm(commentId, authorName) {
-      // Hide any other open reply forms
       document.querySelectorAll('.reply-form-container').forEach(form => {
         form.style.display = 'none';
       });
-      
-      // Show reply form for this comment
       const replyForm = document.getElementById(`reply-form-${commentId}`);
       if (replyForm) {
         replyForm.style.display = 'block';
@@ -253,8 +243,6 @@
         currentReplyParent = null;
       }
     }
-    
-    // Handle reply form submissions
     document.querySelectorAll('.reply-form').forEach(form => {
       form.addEventListener('submit', function(e) {
         e.preventDefault();
@@ -282,7 +270,6 @@
         .then(response => response.json())
         .then(data => {
           if (data.success) {
-            // Reload page to show reply with proper nesting
             location.reload();
           } else {
             alert(data.error || 'Failed to post reply. Please try again.');

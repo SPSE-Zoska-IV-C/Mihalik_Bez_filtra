@@ -33,7 +33,7 @@
     </div>
   </div>
   
-  <!-- Reply Form (hidden by default) -->
+  
   {% if current_user.is_authenticated %}
   <div class="reply-form-container ms-4 mt-2" id="reply-form-{{ comment.id }}" style="display: none;">
     <form class="reply-form" data-parent-id="{{ comment.id }}">
@@ -48,7 +48,7 @@
   </div>
   {% endif %}
   
-  <!-- Replies -->
+  
   {% if comment.replies %}
     <div class="replies-container ms-4 mt-2 border-start border-2 ps-3" style="border-color: var(--card-border);">
       {% for reply in comment.replies %}

@@ -13,16 +13,16 @@ def toggle_like(article_id):
     """Toggle like/unlike for the current user on an article"""
     article = Article.query.get_or_404(article_id)
     
-    # Check if user already has a reaction to this article
+    
     reaction = ArticleReaction.query.filter_by(
         article_id=article_id, user_id=current_user.id
     ).first()
     
     if reaction:
-        # Toggle like status
+        
         reaction.liked = not reaction.liked
     else:
-        # Create new reaction
+        
         reaction = ArticleReaction(
             article_id=article_id,
             user_id=current_user.id,
@@ -32,7 +32,7 @@ def toggle_like(article_id):
     
     db.session.commit()
     
-    # Get updated like count
+    
     like_count = ArticleReaction.query.filter_by(
         article_id=article_id, liked=True
     ).count()
@@ -56,13 +56,13 @@ def add_comment(article_id):
     if not content:
         return jsonify({"success": False, "error": "Comment cannot be empty"}), 400
     
-    # Validate parent_id if provided
+    
     if parent_id:
         parent_comment = Comment.query.get(parent_id)
         if not parent_comment or parent_comment.article_id != article_id:
             return jsonify({"success": False, "error": "Invalid parent comment"}), 400
     
-    # Create new comment
+    
     comment = Comment(
         article_id=article_id,
         user_id=current_user.id,
@@ -72,7 +72,7 @@ def add_comment(article_id):
     db.session.add(comment)
     db.session.commit()
     
-    # Get reply chain for display
+    
     reply_chain = comment.get_reply_chain()
     
     return jsonify({

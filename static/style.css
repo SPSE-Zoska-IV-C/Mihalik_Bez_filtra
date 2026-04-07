@@ -52,7 +52,6 @@ body {
   padding: 1rem;
 }
 
-/* Wider container on larger screens for articles and map */
 @media (min-width: 992px) {
   .container-wide {
     max-width: 1400px;
@@ -65,14 +64,12 @@ body {
   }
 }
 
-/* Better spacing for filter buttons on wider screens */
 @media (min-width: 992px) {
   .btn-group.flex-wrap {
     gap: 0.5rem;
   }
 }
 
-/* Sidebar filter styling */
 .filter-sidebar {
   font-size: 0.875rem;
 }
@@ -189,36 +186,31 @@ body[data-theme="dark"] .filter-link-clear:hover {
   background-color: var(--card-contrast);
 }
 
-/* Comment replies styling – border only under discussion groups */
 .replies-container {
   margin-left: 2rem;
   padding-left: 1rem;
-  /* default no border; context selector will apply color */
+  
   border-left: 2px solid transparent;
 }
 
-/* show lines in discussion pages */
 .discussion-comments .replies-container {
   border-color: var(--card-border);
 }
 
-/* hide lines in article comment sections */
 .article-comments .replies-container {
   border-color: transparent !important;
   border-left: none !important;
-  /* keep the left margin so replies remain indented */
+  
 }
 
 .comment-item {
   margin-bottom: 1rem;
 }
 
-/* Article comments: simple, lightweight bubbles */
 .comment-item.article-comment {
   padding: 0.4rem 0;
 }
 
-/* Forum-style discussion comments: more like posts */
 .comment-item.forum-comment {
   padding: 0.75rem 0.85rem;
   border-radius: 0.65rem;
@@ -249,22 +241,18 @@ body[data-theme="dark"] .filter-link-clear:hover {
   border-radius: 999px;
 }
 
-/* avatar inside comment item */
 .comment-item img {
   flex-shrink: 0;
 }
 
-/* Discussion comments should look more like forum posts */
 .discussion-comments {
   margin-top: 1rem;
 }
 
-/* Alerts should float above content a bit and fade nicely */
 .alert {
   transition: opacity 0.4s ease;
 }
 
-/* flash messages container: fixed, not affecting layout */
 .flash-container {
   position: fixed;
   top: 1rem;
@@ -277,7 +265,6 @@ body[data-theme="dark"] .filter-link-clear:hover {
   margin-bottom: 0.5rem;
 }
 
-/* section titles for grouped discussions */
 .discussion-group-title {
   padding-top: 1rem;
   padding-bottom: 0.5rem;
@@ -312,7 +299,6 @@ body[data-theme="dark"] .replies-container {
   border-color: var(--card-border);
 }
 
-/* Responsive sidebar */
 @media (max-width: 991px) {
   .filter-sidebar {
     position: relative !important;
@@ -320,13 +306,11 @@ body[data-theme="dark"] .replies-container {
   }
 }
 
-/* Navbar should be full width */
 .navbar .container-fluid {
   max-width: 1400px;
   margin: 0 auto;
 }
 
-/* Search bar styling */
 .navbar .input-group .form-control {
   border-radius: 0.5rem 0 0 0.5rem;
   border-right: none;
@@ -363,7 +347,6 @@ body[data-theme="dark"] .navbar .input-group .btn-outline-secondary:hover {
   text-decoration: none;
   font-weight: 700;
 }
-
 
 .btn-turquoise {
   background-color: var(--accent) !important;
@@ -558,7 +541,6 @@ body[data-theme="dark"] #map {
   background: var(--bg);
 }
 
-/* Ensure container and content areas have proper dark mode background */
 body[data-theme="dark"] .container {
   background: var(--bg);
 }
@@ -567,14 +549,12 @@ body[data-theme="dark"] .container.py-3 {
   background: var(--bg);
 }
 
-/* Ensure all page content has dark background */
 html[data-theme="dark"],
 body[data-theme="dark"] {
   background-color: var(--bg) !important;
   background: var(--bg) !important;
 }
 
-/* Ensure html element also gets dark theme */
 html {
   background-color: var(--bg);
   background: var(--bg);
@@ -584,23 +564,19 @@ body[data-theme="dark"] .row {
   background: transparent;
 }
 
-/* Fix for Bootstrap's default white backgrounds */
 body[data-theme="dark"] .card-body,
 body[data-theme="dark"] .card {
   background-color: var(--card) !important;
 }
 
-/* Ensure no white backgrounds appear anywhere in dark mode */
 html[data-theme="dark"],
 html[data-theme="dark"] body {
   background: var(--bg) !important;
   background-color: var(--bg) !important;
 }
 
-/* Ensure html element always has theme attribute for proper styling */
 html {
   background: var(--bg);
   background-color: var(--bg);
 }
-
 
