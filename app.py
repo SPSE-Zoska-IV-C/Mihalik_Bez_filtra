@@ -174,7 +174,7 @@ def index():
     return redirect(url_for("list_articles"))
 
 def extract_location_with_gemini(title: str, content: str, summary: str = "") -> dict:
-    """Extract location from article using Gemini API"""
+    """Zistí miesto súvisiace s článkom pomocou Gemini API,Skúsi vyextrahovať primárnu geografickú lokalitu z textu článku."""
     gemini_key = app.config.get("GEMINI_API_KEY", "")
     if not gemini_key:
         return {"latitude": None, "longitude": None, "location_name": None}
@@ -261,7 +261,7 @@ JSON response:"""
 
 
 def geocode_location(location_name: str) -> dict:
-    """Geocode location name to coordinates using Nominatim (OpenStreetMap)"""
+    """Prekonvertuje názov lokality na súradnice pomocou Nominatim (OpenStreetMap) získa zemepisnu šírku a dĺžku."""
     if not location_name:
         return {"latitude": None, "longitude": None}
     
@@ -298,8 +298,8 @@ def map():
 
 @app.get("/api/articles/with-location")
 def get_articles_with_location():
-    """API endpoint to get articles with location data for map (only articles from last 24 hours)"""
-    
+    """API endpoint na získanie článkov s polohou pre mapu (len za posledných 24 hodín)."""
+    # Vráti JSON so zoznamom článkov, ktoré majú súradnice.
     cutoff_time = datetime.utcnow() - timedelta(hours=24)
     
     articles = Article.query.filter(
@@ -328,8 +328,11 @@ def get_articles_with_location():
     
     return jsonify(articles_data)
 
+
 @app.get("/articles")
 def list_articles():
+    """Načíta člannky z databazy"""
+    # Vráti JSON so zoznamom článkov, ktoré majú súradnice.
     filter_keyword = request.args.get('filter', '').lower()
     search_query = request.args.get('search', '').strip().lower()
     
@@ -384,21 +387,16 @@ def list_articles():
 
 @app.get("/discussions")
 def discussions():
-    """List all discussions, optionally filtered by article.
-
-    When not filtering by a specific article we build up a simple
-    "category" grouping keyed by the linked article (or ``None`` for
-    general/global discussions). The template then iterates over the
-    groups which produces a clearer, more hierarchical listing that
-    better resembles a forum with categories/sub‑forums.
-    """
+    """Zobrazí všetky diskusie, pripadne filtrovabe podla članku.
+    Ak nie je špecifikovaný konkrétny článok, vytvorí sa jednoduché
+    zoskupenie podľa priradeného článku (alebo None pre všeobecné
+    diskusie). Šablóna potom iteruje cez skupiny."""
+    # Načíta diskusie, prípadne podľa článku, a spracuje hierarchiu.
     article_id = request.args.get("article_id", type=int)
     article = Article.query.get_or_404(article_id) if article_id else None
 
     if article:
         discussions = Discussion.query.filter_by(article_id=article.id).order_by(Discussion.date_created.desc()).all()
-        
-        
         return render_template("discussions.html", discussions=discussions, article=article)
 
     
@@ -423,7 +421,7 @@ def discussions():
 @app.route("/discussions/new", methods=["GET", "POST"])
 @login_required
 def new_discussion():
-    """Create a new discussion (global or linked to an article)."""
+    """Vytvorí novú diskusiu, buď globálnu alebo viazanú na článok, formulár"""
     if request.method == "POST":
         title = request.form.get("title", "").strip()
         question = request.form.get("question", "").strip()
@@ -457,7 +455,8 @@ def new_discussion():
 @app.post("/discussions/<int:discussion_id>/delete")
 @login_required
 def delete_discussion(discussion_id: int):
-    """Remove a discussion. Only the author or an admin may delete."""
+    """Odstráni diskusiu. Iba autor alebo admin ju môže zmazať."""
+    # Overí oprávnenie a zmaže diskusné vlákno.
     discussion = Discussion.query.get_or_404(discussion_id)
     if discussion.user_id != current_user.id and not current_user.is_admin:
         flash("You are not allowed to delete that discussion.", "danger")
@@ -472,7 +471,7 @@ def delete_discussion(discussion_id: int):
 
 @app.get("/discussions/<int:discussion_id>")
 def discussion_detail(discussion_id: int):
-    """Show a single discussion with its comments, organised into a tree."""
+    """Zobrazí detail diskusie spolu s komentármi v stromovej štruktúre."""
     discussion = Discussion.query.get_or_404(discussion_id)
     
     
@@ -501,11 +500,9 @@ def discussion_detail(discussion_id: int):
 @app.post("/discussions/<int:discussion_id>/comment")
 @login_required
 def add_discussion_comment(discussion_id: int):
-    """Add a comment (or reply) to a discussion.
-
-    Accepts both regular form submissions and AJAX JSON requests for
-    inline replies. ``parent_id`` may be provided to create a nested
-    comment.
+    """Pridá komentár alebo odpoveď do diskusie.
+    Podporuje klasické odošlé formuláre aj AJAX JSON volania pre
+    inline odpovede. ``parent_id`` môže vytvoriť vnorenú odpoveď.
     """
     discussion = Discussion.query.get_or_404(discussion_id)
 
@@ -550,6 +547,7 @@ def add_discussion_comment(discussion_id: int):
 @app.post("/fetch_article")
 @login_required
 def fetch_article():
+    # Načíta nový článok z viacerých zdrojov a uloží ho do databázy.
     multi_source_fetcher = None
     try:
         from utils.multi_source_fetcher import MultiSourceNewsFetcher
@@ -640,23 +638,11 @@ def fetch_article():
 
     return redirect(url_for("list_articles"))
 
-@app.route("/add_article", methods=["GET", "POST"])
-@login_required
-def add_article():
-    if request.method == "POST":
-        title = request.form.get("title", "").strip()
-        content = request.form.get("content", "").strip()
-        if title and content:
-            article = Article(title=title, content=content, author=current_user)
-            db.session.add(article)
-            db.session.commit()
-            return redirect(url_for("list_articles"))
-    return render_template("add_article.html")
-
 
 @app.route("/article/<int:article_id>")
+# Nacitanie detailu clanku
 def article_detail(article_id):
-    """Display individual article with comments"""
+    """Zobrazí detail článku vrátane komentárov."""
     article = Article.query.get_or_404(article_id)
     
     user_reaction = None

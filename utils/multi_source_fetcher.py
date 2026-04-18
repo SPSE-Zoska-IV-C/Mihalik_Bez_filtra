@@ -1,6 +1,5 @@
 """
-Multi-source news fetcher that aggregates articles from multiple sources
-about the same topic, similar to Ground News.
+Nástroj na načítanie správ z viacerých zdrojov a zoskupovanie článkov na tú istú tému.
 """
 import feedparser
 import requests
@@ -15,11 +14,10 @@ import os
 
 
 class MultiSourceNewsFetcher:
-    """Fetches news from multiple sources and groups by topic"""
+    """Načíta správy z viacerých zdrojov a trie ich podľa témy."""
     
     
     RSS_FEEDS = [
-        
         "https://feeds.bbci.co.uk/news/rss.xml",  
         "https://feeds.bbci.co.uk/news/world/rss.xml",  
         "https://rss.cnn.com/rss/edition.rss",  
@@ -59,7 +57,7 @@ class MultiSourceNewsFetcher:
         self.gemini_api_key = gemini_api_key or os.getenv("GEMINI_API_KEY", "")
     
     def fetch_all_feeds(self) -> List[Dict]:
-        """Fetch articles from all RSS feeds"""
+        """Načíta články zo všetkých RSS kanálov do zoznamu."""
         all_articles = []
         
         for feed_url in self.RSS_FEEDS:
@@ -97,7 +95,7 @@ class MultiSourceNewsFetcher:
         return all_articles
     
     def _extract_source_name(self, feed_url: str) -> str:
-        """Extract source name from feed URL"""
+        """Získa názov zdroja z URL RSS kanála."""
         domain = urlparse(feed_url).netloc
         if 'bbc' in domain:
             return 'BBC News'
@@ -126,13 +124,9 @@ class MultiSourceNewsFetcher:
         return domain.replace('www.', '').split('.')[0].title()
     
     def _extract_image(self, entry) -> Optional[str]:
-        """
-        Extract image URL from RSS entry using a simple, reliable approach.
-        Focuses on RSS feed images which are usually reliable and decent quality.
-        """
+        """Vyberie URL obrázka z RSS položky jednoduchým a spoľahlivým spôsobom."""
         article_link = entry.get('link', '')
         images_found = []
-        
         
         if hasattr(entry, 'media_content'):
             for media in entry.media_content:
@@ -193,7 +187,7 @@ class MultiSourceNewsFetcher:
         return None
     
     def _make_absolute_url(self, url: str, base_url: str = None) -> str:
-        """Convert relative URL to absolute URL."""
+        """Prevedie relatívnu URL na absolútnu."""
         if not url:
             return url
         
@@ -213,7 +207,8 @@ class MultiSourceNewsFetcher:
         return url
     
     def _upgrade_image_resolution(self, image_url: str) -> str:
-        """Try to get higher resolution version of image by removing size parameters."""
+        """Pokusí sa získať obrázok vo vyššom rozlíšení odstránením parametrov veľkosti."""
+        # Upraví URL obrázka, aby preferovala väčší rozmer.
         if not image_url:
             return image_url
         
@@ -260,10 +255,7 @@ class MultiSourceNewsFetcher:
         return upgraded_url
 
     def _get_reliable_image_for_article(self, article_group: List[Dict]) -> Optional[str]:
-        """
-        Get a reliable, decent quality image for an article.
-        Uses only RSS feed images to avoid 403 errors and blocking.
-        """
+        """Vyberie spoľahlivý obrázok vo vhodnej kvalite pre článok."""
         all_images = []
         
         for article in article_group:
@@ -313,7 +305,8 @@ class MultiSourceNewsFetcher:
         return upgraded
     
     def _fetch_article_content(self, url: str) -> str:
-        """Fetch full article content from URL"""
+        """Načíta celý obsah článku z danej URL."""
+        # Stiahne HTML stránku a extrahuje hlavný text.
         try:
             response = self.session.get(url, timeout=10)
             response.raise_for_status()
@@ -353,7 +346,7 @@ class MultiSourceNewsFetcher:
             return ''
     
     def _calculate_similarity(self, title1: str, title2: str) -> float:
-        """Calculate similarity between two titles using simple word overlap"""
+        """Vypočíta podobnosť medzi dvoma nadpismi pomocou slovnej zhody."""
         words1 = set(re.findall(r'\w+', title1.lower()))
         words2 = set(re.findall(r'\w+', title2.lower()))
         
@@ -367,7 +360,7 @@ class MultiSourceNewsFetcher:
         return len(intersection) / len(union) if union else 0.0
     
     def _summarize_content(self, content: str, max_length: int = 150) -> str:
-        """Create a simple summary from content"""
+        """Vytvorí jednoduché zhrnutie obsahu."""
         if not content:
             return ""
         
@@ -410,10 +403,7 @@ class MultiSourceNewsFetcher:
         return summary.strip()
     
     def _select_best_image_with_gemini(self, images: List[Dict], title: str, bullet_points: List[str]) -> Optional[str]:
-        """
-        Select the best image from multiple sources using Gemini to validate relevance and quality.
-        Falls back to highest quality image if Gemini is unavailable.
-        """
+        """Vyberie najlepší obrázok s pomocou Gemini overenia relevantnosti a kvality."""
         if not images:
             return None
         
@@ -480,7 +470,7 @@ class MultiSourceNewsFetcher:
         return None
     
     def _validate_image_relevance_with_gemini(self, image_candidates: List[Dict], title: str, bullet_points: List[str]) -> Optional[str]:
-        """Use Gemini to validate which image is most relevant to the article."""
+        """Použije Gemini na overenie, ktorý obrázok je pre článok najrelevantnejší."""
         if not self.gemini_api_key or not image_candidates:
             return None
         
@@ -545,7 +535,7 @@ Best image number:"""
         return None
     
     def _generate_bullets_with_gemini(self, source_summaries: List[Dict], title: str) -> List[str]:
-        """Generate bullet points using Gemini API"""
+        """Vygeneruje zoznam bodov o článku pomocou Gemini API."""
         if not self.gemini_api_key:
             print("Gemini API key not found, falling back to basic extraction")
             return []
@@ -682,10 +672,7 @@ Bullet points:"""
             return []
     
     def _extract_generalized_bullets(self, source_summaries: List[Dict], max_bullets: int = 5, title: str = "") -> List[str]:
-        """
-        Extract overarching bullet points that summarize key angles across sources.
-        Uses Gemini API if available, otherwise falls back to basic extraction.
-        """
+        """Extrahuje hlavné body, ktoré zhrnú dôležité uhly naprieč zdrojmi."""
         if not source_summaries:
             return []
         
@@ -763,7 +750,7 @@ Bullet points:"""
         return bullets[:max_bullets]
     
     def group_by_topic(self, articles: List[Dict], similarity_threshold: float = 0.3) -> List[List[Dict]]:
-        """Group articles by topic similarity"""
+        """Zoskupí články podľa podobnosti tém."""
         groups = []
         used = set()
         
@@ -789,7 +776,7 @@ Bullet points:"""
         return groups
     
     def analyze_available_stories(self, exclude_titles: List[str] = None) -> List[Dict]:
-        """First phase: Analyze and find which stories are covered by multiple sources"""
+        """Prvá fáza: analyzuje, ktoré príbehy pokrýva viacero zdrojov."""
         if exclude_titles is None:
             exclude_titles = []
         
@@ -846,7 +833,7 @@ Bullet points:"""
         return available_stories
     
     def fetch_multi_source_article(self, exclude_titles: List[str] = None) -> Optional[Dict]:
-        """Fetch and group articles from multiple sources about the same topic"""
+        """Načíta a zoskupí články z viacerých zdrojov na rovnakú tému."""
         if exclude_titles is None:
             exclude_titles = []
         
@@ -943,7 +930,7 @@ Bullet points:"""
             print("Could not extract enough bullet points")
             return None
         
-        
+#ukladanie zdrojov a bullet pointov
         data_to_store = {
             'bullets': bullet_points,
             'sources': [{'source': s['source'], 'url': s['url']} for s in source_summaries]
@@ -951,7 +938,6 @@ Bullet points:"""
         
         
         main_image = self._get_reliable_image_for_article(current_group) if current_group else None
-        
         
         title = main_article.get('title', 'Breaking News')
         if not title or len(title.strip()) < 10:

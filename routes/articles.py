@@ -10,7 +10,8 @@ articles_bp = Blueprint("articles_bp", __name__)
 @articles_bp.route("/article/<int:article_id>/like", methods=["POST"])
 @login_required
 def toggle_like(article_id):
-    """Toggle like/unlike for the current user on an article"""
+    """Prepne like/odlike pre aktuálneho používateľa na článku."""
+    # Uloží alebo aktualizuje reakciu používateľa na článok.
     article = Article.query.get_or_404(article_id)
     
     
@@ -48,7 +49,7 @@ def toggle_like(article_id):
 @articles_bp.route("/article/<int:article_id>/comment", methods=["POST"])
 @login_required
 def add_comment(article_id):
-    """Add a user comment to an article or reply to a comment"""
+    """Pridá komentár k článku, Uloží komentár do databázy a vráti JSON odpoveď."""
     article = Article.query.get_or_404(article_id)
     content = request.json.get("content", "").strip()
     parent_id = request.json.get("parent_id", None)

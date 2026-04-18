@@ -12,9 +12,9 @@ auth_bp = Blueprint("auth", __name__, url_prefix="")
 
 oauth = OAuth()
 
-
+#OAuth klient pre Google prihlásenie
 def init_oauth(app):
-    """Initialize OAuth with Google"""
+    """Inicializuje OAuth pre Google."""
     oauth.init_app(app)
     
     
@@ -35,6 +35,7 @@ def init_oauth(app):
 
 @auth_bp.route("/register", methods=["GET", "POST"])
 def register():
+    # Spracuje registráciu nového používateľa.
     if current_user.is_authenticated:
         return redirect(url_for("list_articles"))
     if request.method == "POST":
@@ -66,6 +67,7 @@ def register():
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
+    # Spracuje prihlásenie používateľa podľa mena alebo e-mailu.
     if current_user.is_authenticated:
         return redirect(url_for("list_articles"))
     if request.method == "POST":
@@ -86,7 +88,8 @@ def login():
 
 @auth_bp.route("/login/google")
 def google_login():
-    """Initiate Google OAuth login"""
+    """Spustí Google OAuth prihlasovanie."""
+    # Presmeruje používateľa na Google pre OAuth autorizáciu.
     if not current_app.config.get("GOOGLE_CLIENT_ID") or not oauth:
         flash("Google login is not configured.", "danger")
         return redirect(url_for("auth.login"))
@@ -101,10 +104,10 @@ def google_login():
     
     return oauth.google.authorize_redirect(redirect_uri)
 
-
+# Ziskanie udajov z goofle
 @auth_bp.route("/callback/google")
 def google_callback():
-    """Handle Google OAuth callback"""
+    """Spracuje spätné volanie z Google OAuth."""
     if not oauth:
         flash("Google login is not configured.", "danger")
         return redirect(url_for("auth.login"))
@@ -116,7 +119,7 @@ def google_callback():
         
         
         
-        
+    
         token = oauth.google.authorize_access_token()
         print(f"Token received: {bool(token)}")
         

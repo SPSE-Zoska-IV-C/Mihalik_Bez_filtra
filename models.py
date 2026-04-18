@@ -30,7 +30,7 @@ class User(db.Model, UserMixin):
     
     @staticmethod
     def create_google_user(google_id: str, email: str, name: str, picture: str = None):
-        """Create or get user from Google OAuth"""
+        """Vytvorí alebo vráti používateľa na základe Google OAuth údajov.Pridá nového používateľa alebo priradí Google účet existujúcemu."""
         try:
             
             user = User.query.filter_by(google_id=google_id).first()
@@ -94,6 +94,7 @@ class User(db.Model, UserMixin):
             raise
 
     def profile_image_url(self, size: int = 128) -> str:
+        # Vráti URL profilového obrázka alebo generuje avatar na základe mena/emailu.
         if self.profile_image:
             if self.profile_image.startswith("http"):
                 return self.profile_image
@@ -129,9 +130,7 @@ class Article(db.Model):
         return f"https://picsum.photos/seed/{seed}/{width}/{height}"
 
     def cover_image_url(self, width: int = 800, height: int = 450) -> str:
-        """
-        Returns the stored photo if present, otherwise a deterministic placeholder.
-        """
+        """Vráti uložený obrázok článku alebo predvolený placeholder obrázok."""
         if self.photo:
             return self.photo
         return self.placeholder_image_url(width, height)
@@ -140,7 +139,7 @@ class Article(db.Model):
         return f"https://picsum.photos/seed/{seed}/{width}/{height}"
 
     def get_sources(self):
-        """Parse sources from content JSON if it's a multi-source article"""
+        """Parsuje zdroje z obsahu článku, ak ide o multi-source formát, Skúsi dekódovať JSON z obsahu a vráti údaje o zdrojoch."""
         import json
         try:
             data = json.loads(self.content)
@@ -176,7 +175,7 @@ class Comment(db.Model):
     parent = db.relationship("Comment", remote_side=[id], backref="replies")
     
     def get_reply_chain(self):
-        """Get the chain of usernames this comment is replying to"""
+        """Získa reťazec používateľských mien, na ktoré tento komentár odpovedá, Prejde predchádzajúce odpovede a zoberie mená autorov."""
         chain = []
         current = self.parent
         while current:
