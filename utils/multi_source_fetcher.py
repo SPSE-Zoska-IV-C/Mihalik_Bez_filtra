@@ -14,9 +14,6 @@ import os
 
 
 class MultiSourceNewsFetcher:
-    """Načíta správy z viacerých zdrojov a trie ich podľa témy."""
-    
-    
     RSS_FEEDS = [
         "https://feeds.bbci.co.uk/news/rss.xml",  
         "https://feeds.bbci.co.uk/news/world/rss.xml",  
@@ -81,17 +78,11 @@ class MultiSourceNewsFetcher:
                         'source_url': feed_url
                     }
                     
-                    
                     article['image'] = self._extract_image(entry)
-                    
-                    
-                    
-                    
                     all_articles.append(article)
             except Exception as e:
                 print(f"Error fetching feed {feed_url}: {e}")
                 continue
-        
         return all_articles
     
     def _extract_source_name(self, feed_url: str) -> str:
@@ -160,14 +151,12 @@ class MultiSourceNewsFetcher:
                 src = img.get('src') or img.get('data-src') or img.get('data-lazy-src')
                 if src:
                     src = self._make_absolute_url(src, article_link)
-                    
                     width = int(img.get('width', 0) or 0)
                     height = int(img.get('height', 0) or 0)
                     if width > 0 and height > 0 and (width < 100 or height < 100):
                         continue  
                     size = width * height if width and height else 30000  
                     images_found.append((src, size, 'html', width, height))
-        
         
         if images_found:
             
@@ -187,18 +176,15 @@ class MultiSourceNewsFetcher:
         return None
     
     def _make_absolute_url(self, url: str, base_url: str = None) -> str:
-        """Prevedie relatívnu URL na absolútnu."""
+        """Prevedie relatívnu URL na absolútnu, Používa sa hlavne pri spracovaní obrázkov z RSS, kde môžu byť URL relatívne voči článku."""
         if not url:
             return url
-        
         
         if url.startswith('http://') or url.startswith('https://'):
             return url
         
-        
         if url.startswith('//'):
             return 'https:' + url
-        
         
         if base_url:
             from urllib.parse import urljoin
@@ -208,13 +194,10 @@ class MultiSourceNewsFetcher:
     
     def _upgrade_image_resolution(self, image_url: str) -> str:
         """Pokusí sa získať obrázok vo vyššom rozlíšení odstránením parametrov veľkosti."""
-        # Upraví URL obrázka, aby preferovala väčší rozmer.
         if not image_url:
             return image_url
         
-        
         upgraded_url = image_url
-        
         
         patterns_to_remove = [
             r'[?&](w|width)=\d+',
@@ -267,20 +250,16 @@ class MultiSourceNewsFetcher:
                 if article_link:
                     image_url = self._make_absolute_url(image_url, article_link)
                 
-                
                 score = 0
                 url_lower = image_url.lower()
                 
-                
                 if any(cdn in url_lower for cdn in ['cdn', 'static', 'media', 'assets']):
                     score += 10
-                
                 
                 if any(size in url_lower for size in ['large', 'full', 'original', 'high']):
                     score += 20
                 elif any(size in url_lower for size in ['thumb', 'small', 'medium']):
                     score -= 5
-                
                 
                 if any(ext in url_lower for ext in ['.jpg', '.jpeg', '.png', '.webp']):
                     score += 5
@@ -293,29 +272,25 @@ class MultiSourceNewsFetcher:
         
         if not all_images:
             return None
-        
-        
+    
         all_images.sort(key=lambda x: x['score'], reverse=True)
         best_image = all_images[0]['url']
-        
         
         upgraded = self._upgrade_image_resolution(best_image)
         print(f"Selected image from {all_images[0]['source']}: {upgraded[:80]}...")
         
         return upgraded
     
+    #ZATIAL NEVYUZITE, do buducna mozna lepsia alternativa
     def _fetch_article_content(self, url: str) -> str:
         """Načíta celý obsah článku z danej URL."""
-        # Stiahne HTML stránku a extrahuje hlavný text.
         try:
             response = self.session.get(url, timeout=10)
             response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
             
-            
             for script in soup(["script", "style", "nav", "header", "footer"]):
                 script.decompose()
-            
             
             content_selectors = [
                 'article',
@@ -336,11 +311,8 @@ class MultiSourceNewsFetcher:
                 content = soup.find('body')
             
             if content:
-                
                 text = content.get_text(separator=' ', strip=True)
-                
                 return text[:2000] if len(text) > 2000 else text
-            
             return ''
         except Exception:
             return ''
@@ -355,27 +327,20 @@ class MultiSourceNewsFetcher:
         
         intersection = words1.intersection(words2)
         union = words1.union(words2)
-        
-        
         return len(intersection) / len(union) if union else 0.0
     
     def _summarize_content(self, content: str, max_length: int = 150) -> str:
         """Vytvorí jednoduché zhrnutie obsahu."""
         if not content:
             return ""
-        
-        
+
         try:
             soup = BeautifulSoup(content, 'html.parser')
             content = soup.get_text()
         except:
-            
             pass
         
-        
         content = ' '.join(content.split())
-        
-        
         if len(content) <= max_length:
             return content
         
@@ -399,140 +364,7 @@ class MultiSourceNewsFetcher:
                 summary = ' '.join(words[:-1]) + "..."
             else:
                 summary = content[:max_length] + "..."
-        
         return summary.strip()
-    
-    def _select_best_image_with_gemini(self, images: List[Dict], title: str, bullet_points: List[str]) -> Optional[str]:
-        """Vyberie najlepší obrázok s pomocou Gemini overenia relevantnosti a kvality."""
-        if not images:
-            return None
-        
-        if len(images) == 1:
-            return self._upgrade_image_resolution(images[0]['url'])
-        
-        print(f"Selecting best image from {len(images)} candidates using Gemini...")
-        
-        
-        scored_images = []
-        for img_data in images:
-            url = img_data.get('url', '')
-            if not url:
-                continue
-            
-            
-            upgraded_url = self._upgrade_image_resolution(url)
-            
-            
-            score = 0
-            url_lower = upgraded_url.lower()
-            source = img_data.get('source', '').lower()
-            
-            
-            if any(reputable in source for reputable in ['bbc', 'reuters', 'guardian', 'nytimes', 'cnn', 'npr']):
-                score += 10
-            
-            
-            if any(pattern in url_lower for pattern in ['/full/', '/original/', '/large/', '/high-res']):
-                score += 20
-            elif any(pattern in url_lower for pattern in ['/thumb/', '/small/', '/medium/']):
-                score -= 10
-            
-            
-            if '?' not in upgraded_url or not re.search(r'[?&](w|width|h|height|s|size)=\d+', upgraded_url):
-                score += 15
-            
-            scored_images.append({
-                'url': upgraded_url,
-                'original_url': url,
-                'score': score,
-                'source': img_data.get('source', 'Unknown')
-            })
-        
-        
-        scored_images.sort(key=lambda x: x['score'], reverse=True)
-        
-        
-        if self.gemini_api_key and len(scored_images) > 0:
-            top_candidates = scored_images[:5]  
-            validated_image = self._validate_image_relevance_with_gemini(
-                top_candidates, title, bullet_points
-            )
-            if validated_image:
-                print(f"✓ Selected image validated by Gemini: {validated_image[:80]}...")
-                return validated_image
-        
-        
-        if scored_images:
-            best = scored_images[0]
-            print(f"✓ Selected best image from {best['source']}: {best['url'][:80]}...")
-            return best['url']
-        
-        return None
-    
-    def _validate_image_relevance_with_gemini(self, image_candidates: List[Dict], title: str, bullet_points: List[str]) -> Optional[str]:
-        """Použije Gemini na overenie, ktorý obrázok je pre článok najrelevantnejší."""
-        if not self.gemini_api_key or not image_candidates:
-            return None
-        
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=self.gemini_api_key)
-            
-            
-            model = None
-            for model_name in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro']:
-                try:
-                    model = genai.GenerativeModel(model_name)
-                    break
-                except:
-                    continue
-            
-            if not model:
-                return None
-            
-            
-            bullets_text = "\n".join([f"- {bp}" for bp in bullet_points[:5]])  
-            
-            
-            image_list = "\n".join([f"{i+1}. {c['url']} (from {c['source']})" for i, c in enumerate(image_candidates)])
-            
-            prompt = f"""You are analyzing news article images to determine which one is most relevant, appropriate, and high-quality for the story.
-
-Article Title: {title}
-
-Key Points:
-{bullets_text}
-
-Available Images:
-{image_list}
-
-Instructions:
-- Determine which image (1-{len(image_candidates)}) is most relevant to this news story
-- The image should directly relate to the event described in the article
-- Prefer high-quality, high-resolution images over low-resolution thumbnails
-- Avoid generic placeholder images, logos, or unrelated stock photos
-- The image should be from the actual event or story, not a generic illustration
-- Return ONLY the number (1-{len(image_candidates)}) of the best image, nothing else
-
-Best image number:"""
-            
-            response = model.generate_content(prompt)
-            result = response.text.strip()
-            
-            
-            match = re.search(r'\b([1-9]|10)\b', result)
-            if match:
-                idx = int(match.group(1)) - 1
-                if 0 <= idx < len(image_candidates):
-                    selected = image_candidates[idx]
-                    print(f"✓ Gemini selected image {idx + 1} from {selected['source']}")
-                    return selected['url']
-            
-        except Exception as e:
-            print(f"Error validating image with Gemini: {e}")
-            return None
-        
-        return None
     
     def _generate_bullets_with_gemini(self, source_summaries: List[Dict], title: str) -> List[str]:
         """Vygeneruje zoznam bodov o článku pomocou Gemini API."""
@@ -542,9 +374,7 @@ Best image number:"""
         
         try:
             import google.generativeai as genai
-            
             genai.configure(api_key=self.gemini_api_key)
-            
             
             try:
                 models = genai.list_models()
@@ -563,8 +393,6 @@ Best image number:"""
                             print(f"Found preferred model: {pref}")
             except Exception as list_error:
                 print(f"Could not list models: {list_error}")
-            
-            
             
             model = None
             model_name = None
@@ -591,7 +419,6 @@ Best image number:"""
             if model is None:
                 print("✗ Could not initialize any Gemini model")
                 return []
-            
             
             sources_text = ""
             for i, source in enumerate(source_summaries, 1):
@@ -633,7 +460,6 @@ Bullet points:"""
             
             response = model.generate_content(prompt)
             bullets_text = response.text.strip()
-            
             
             bullets = []
             lines = bullets_text.split('\n')
@@ -681,7 +507,6 @@ Bullet points:"""
             gemini_bullets = self._generate_bullets_with_gemini(source_summaries, title)
             if gemini_bullets:
                 return gemini_bullets
-        
         
         print("Using fallback bullet extraction method")
         combined_texts = []
@@ -796,12 +621,10 @@ Bullet points:"""
         
         print(f"Found {len(groups)} story groups, checking which are new...")
         
-        
         available_stories = []
         for group in groups:
             main_title = group[0].get('title', '')
             source_count = len(set(a.get('source', 'Unknown') for a in group))
-            
             
             is_new = True
             max_similarity = 0.0
@@ -826,7 +649,6 @@ Bullet points:"""
                 else:
                     print(f"  ✗ SKIP: '{main_title[:60]}...' (only {source_count} sources)")
         
-        
         available_stories.sort(key=lambda x: (-x['source_count'], x['max_similarity']))
         
         print(f"\nPhase 1 complete: Found {len(available_stories)} new stories covered by multiple sources")
@@ -837,7 +659,6 @@ Bullet points:"""
         if exclude_titles is None:
             exclude_titles = []
         
-        
         available_stories = self.analyze_available_stories(exclude_titles)
         
         if not available_stories:
@@ -847,14 +668,11 @@ Bullet points:"""
         print(f"\nPhase 2: Fetching details for best story...")
         print(f"Selected: '{available_stories[0]['title'][:60]}...' ({available_stories[0]['source_count']} sources)")
         
-        
         for story_idx, selected_story in enumerate(available_stories[:5]):  
             current_group = selected_story['group']
             print(f"\nTrying story {story_idx + 1}: '{selected_story['title'][:60]}...'")
             
-            
             main_article = current_group[0]
-            
             
             source_summaries = []
             images = []
@@ -903,7 +721,6 @@ Bullet points:"""
             
             print(f"Total sources with valid summaries: {len(source_summaries)}")
             
-            
             if len(source_summaries) >= 2:
                 print(f"✓ Successfully extracted {len(source_summaries)} summaries")
                 break
@@ -912,17 +729,13 @@ Bullet points:"""
                 source_summaries = []  
                 continue
         
-        
         if len(source_summaries) < 2:
             print(f"✗ Could not find any story with at least 2 valid summaries after trying {min(5, len(available_stories))} stories")
             return None
         
-        
         print(f"Successfully found story with {len(source_summaries)} sources")
         
-        
         article_title = main_article.get('title', 'Breaking News')
-        
         
         bullet_points = self._extract_generalized_bullets(source_summaries, max_bullets=7, title=article_title)
         

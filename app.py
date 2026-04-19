@@ -12,8 +12,6 @@ load_dotenv()
 
 app = Flask(__name__)
 
-
-
 database_url = os.getenv("DATABASE_URL")
 if database_url:
     app.config["SQLALCHEMY_DATABASE_URI"] = database_url
@@ -45,6 +43,7 @@ with app.app_context():
     from sqlalchemy import text as _sql_text
 
     def _ensure_article_columns():
+        """Zabezpečí, že tabuľka article má všetky potrebné stĺpce pre multi-source články."""
         try:
             cols = db.session.execute(_sql_text("PRAGMA table_info('article');")).fetchall()
             existing = {c[1] for c in cols}
@@ -69,6 +68,7 @@ with app.app_context():
             pass
 
     def _ensure_comment_columns():
+        """Zabezpečí, že tabuľka comment má stĺpec parent_id pre vnorené komentáre."""
         try:
             cols = db.session.execute(_sql_text("PRAGMA table_info('comment');")).fetchall()
             existing = {c[1] for c in cols}
@@ -79,6 +79,7 @@ with app.app_context():
             pass
 
     def _ensure_discussion_comment_columns():
+        """Zabezpečí, že tabuľka discussion_comment má stĺpec parent_id pre vnorené komentáre v diskusiách."""
         try:
             cols = db.session.execute(_sql_text("PRAGMA table_info('discussion_comment');")).fetchall()
             existing = {c[1] for c in cols}
@@ -91,6 +92,7 @@ with app.app_context():
             pass
 
     def _ensure_user_columns():
+        """Zabezpečí, že tabuľka user má potrebné stĺpce pre OAuth a profilové obrázky, vrátane konverzie password_hash na nullable."""
         try:
             cols = db.session.execute(_sql_text("PRAGMA table_info('user');")).fetchall()
             existing = {c[1] for c in cols}
@@ -547,7 +549,7 @@ def add_discussion_comment(discussion_id: int):
 @app.post("/fetch_article")
 @login_required
 def fetch_article():
-    # Načíta nový článok z viacerých zdrojov a uloží ho do databázy.
+    """Načíta nový článok z viacerých zdrojov a uloží ho do databázy."""
     multi_source_fetcher = None
     try:
         from utils.multi_source_fetcher import MultiSourceNewsFetcher
