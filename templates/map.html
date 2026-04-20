@@ -222,6 +222,9 @@
             iconSize: [30, 30],
             iconAnchor: [15, 15]
         });
+
+        //Načíta JSON zo servera s článkami, ktoré majú súradnice (latitude, longitude).
+        // Pre každý článok s polohou vytvorí marker na mape.
         fetch('/api/articles/with-location')
         .then(response => response.json())
         .then(articles => {
@@ -240,6 +243,7 @@
                             <a href="/article/${article.id}" class="read-more-btn">Read Full Article →</a>
                         </div>
                     `;
+                    // Vytvorí marker na súradniciach článku s ikonou
                     var marker = L.marker(
                         [article.latitude, article.longitude],
                         { icon: newsIcon }

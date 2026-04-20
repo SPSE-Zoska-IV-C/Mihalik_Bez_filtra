@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_login import login_required, current_user
 from extensions import db, bcrypt, login_manager, migrate
@@ -177,14 +177,14 @@ def index():
 
 def extract_location_with_gemini(title: str, content: str, summary: str = "") -> dict:
     """Zistí miesto súvisiace s článkom pomocou Gemini API,Skúsi vyextrahovať primárnu geografickú lokalitu z textu článku."""
+    #kontrola API kľúča
     gemini_key = app.config.get("GEMINI_API_KEY", "")
     if not gemini_key:
         return {"latitude": None, "longitude": None, "location_name": None}
-    
+    # ijnicializacia gemini 
     try:
         import google.generativeai as genai
         genai.configure(api_key=gemini_key)
-        
         
         model = None
         for model_name in ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.5-pro', 'gemini-1.5-flash']:
@@ -196,13 +196,12 @@ def extract_location_with_gemini(title: str, content: str, summary: str = "") ->
         
         if not model:
             return {"latitude": None, "longitude": None, "location_name": None}
-        
-        
+        #priprava textu clanku
         article_text = f"Title: {title}\n\n"
         if summary:
             article_text += f"Summary: {summary}\n\n"
         article_text += f"Content: {content[:2000]}"  
-        
+        #prompt
         prompt = f"""Analyze this news article and determine the primary geographic location where the event occurred or is most relevant.
 
 {article_text}
@@ -226,14 +225,12 @@ If you cannot determine a location, return:
 }}
 
 JSON response:"""
-        
+
         response = model.generate_content(prompt)
         response_text = response.text.strip()
-        
-        
+        #Spracovanie odpovede 
         import json
         import re
-        
         
         response_text = re.sub(r'```json\s*', '', response_text)
         response_text = re.sub(r'```\s*', '', response_text)
@@ -246,8 +243,8 @@ JSON response:"""
                 "longitude": location_data.get("longitude"),
                 "location_name": location_data.get("location_name")
             }
+        # Fallback parsing (ak JSON zlyha lebo nemame suradnice iba nazov)
         except json.JSONDecodeError:
-            
             location_name_match = re.search(r'"location_name":\s*"([^"]+)"', response_text)
             if location_name_match:
                 return {
@@ -256,7 +253,7 @@ JSON response:"""
                     "location_name": location_name_match.group(1)
                 }
             return {"latitude": None, "longitude": None, "location_name": None}
-            
+            #Regex sa pokúša nájsť vzor "location_name": "..." a extrahovať len text z úvodzoviek.
     except Exception as e:
         print(f"Error extracting location with Gemini: {e}")
         return {"latitude": None, "longitude": None, "location_name": None}
@@ -266,7 +263,7 @@ def geocode_location(location_name: str) -> dict:
     """Prekonvertuje názov lokality na súradnice pomocou Nominatim (OpenStreetMap) získa zemepisnu šírku a dĺžku."""
     if not location_name:
         return {"latitude": None, "longitude": None}
-    
+    # Príprava requestu na Nominatim
     try:
         import requests
         url = "https://nominatim.openstreetmap.org/search"
@@ -278,8 +275,8 @@ def geocode_location(location_name: str) -> dict:
         headers = {
             "User-Agent": "BezFiltraNewsApp/1.0"
         }
-        
         response = requests.get(url, params=params, headers=headers, timeout=5)
+        #Spracovanie odpovede
         if response.status_code == 200:
             data = response.json()
             if data and len(data) > 0:
@@ -300,14 +297,13 @@ def map():
 
 @app.get("/api/articles/with-location")
 def get_articles_with_location():
-    """API endpoint na získanie článkov s polohou pre mapu (len za posledných 24 hodín)."""
-    # Vráti JSON so zoznamom článkov, ktoré majú súradnice.
-    cutoff_time = datetime.utcnow() - timedelta(hours=24)
-    
+    """API endpoint na získanie článkov s polohou pre mapu,JSON so zoznamom článkov, ktoré majú súradnice"""
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24) # cas po ktorom sa clanky vymazu
+    #kriteria pre nacitanie clanku na mapu
     articles = Article.query.filter(
         Article.latitude.isnot(None),
         Article.longitude.isnot(None),
-        Article.date_posted >= cutoff_time
+        Article.date_posted >= cutoff_time 
     ).order_by(Article.date_posted.desc()).limit(100).all()
     
     articles_data = []
@@ -333,8 +329,7 @@ def get_articles_with_location():
 
 @app.get("/articles")
 def list_articles():
-    """Načíta člannky z databazy"""
-    # Vráti JSON so zoznamom článkov, ktoré majú súradnice.
+    """Načítava člannky z databazy."""
     filter_keyword = request.args.get('filter', '').lower()
     search_query = request.args.get('search', '').strip().lower()
     
@@ -401,14 +396,12 @@ def discussions():
         discussions = Discussion.query.filter_by(article_id=article.id).order_by(Discussion.date_created.desc()).all()
         return render_template("discussions.html", discussions=discussions, article=article)
 
-    
     all_discussions = Discussion.query.order_by(Discussion.date_created.desc()).all()
     groups = {}
     for d in all_discussions:
         key = d.article  
         groups.setdefault(key, []).append(d)
 
-    
     grouped_list = []
     
     if None in groups:
@@ -458,7 +451,6 @@ def new_discussion():
 @login_required
 def delete_discussion(discussion_id: int):
     """Odstráni diskusiu. Iba autor alebo admin ju môže zmazať."""
-    # Overí oprávnenie a zmaže diskusné vlákno.
     discussion = Discussion.query.get_or_404(discussion_id)
     if discussion.user_id != current_user.id and not current_user.is_admin:
         flash("You are not allowed to delete that discussion.", "danger")
@@ -561,7 +553,6 @@ def fetch_article():
         traceback.print_exc()
         multi_source_fetcher = None
 
-    
     existing_titles = [a.title for a in Article.query.with_entities(Article.title).all()]
     
     data = None
@@ -610,7 +601,7 @@ def fetch_article():
                 photo=photo,
                 source_url=source_url,
                 author=current_user,
-                date_posted=datetime.utcnow(),
+                date_posted=datetime.now(timezone.utc),
                 latitude=location_data.get("latitude"),
                 longitude=location_data.get("longitude"),
                 location_name=location_data.get("location_name")
@@ -642,9 +633,8 @@ def fetch_article():
 
 
 @app.route("/article/<int:article_id>")
-# Nacitanie detailu clanku
 def article_detail(article_id):
-    """Zobrazí detail článku vrátane komentárov."""
+    """Zobrazovanie detailu clanku."""
     article = Article.query.get_or_404(article_id)
     
     user_reaction = None
@@ -653,20 +643,16 @@ def article_detail(article_id):
             article_id=article_id, user_id=current_user.id
         ).first()
     
-    
     like_count = ArticleReaction.query.filter_by(
         article_id=article_id, liked=True
     ).count()
-    
     
     top_level_comments = Comment.query.filter_by(
         article_id=article_id, 
         parent_id=None
     ).order_by(Comment.date_posted.asc()).all()
     
-    
     all_comments = Comment.query.filter_by(article_id=article_id).order_by(Comment.date_posted.asc()).all()
-    
     
     comments_dict = {c.id: c for c in all_comments}
     for comment in all_comments:

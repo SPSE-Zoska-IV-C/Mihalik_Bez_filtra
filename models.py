@@ -32,21 +32,15 @@ class User(db.Model, UserMixin):
     def create_google_user(google_id: str, email: str, name: str, picture: str = None):
         """Vytvorí alebo vráti používateľa na základe Google OAuth údajov.Pridá nového používateľa alebo priradí Google účet existujúcemu."""
         try:
-            
             user = User.query.filter_by(google_id=google_id).first()
-            
             if user:
-                
                 if picture and not user.profile_image:
                     user.profile_image = picture
                 db.session.commit()
                 return user
             
-            
             user = User.query.filter_by(email=email).first()
             if user:
-                
-                
                 existing_google_user = User.query.filter_by(google_id=google_id).first()
                 if existing_google_user and existing_google_user.id != user.id:
                     raise ValueError(f"Google ID {google_id} is already linked to another account")
@@ -57,15 +51,12 @@ class User(db.Model, UserMixin):
                 db.session.commit()
                 return user
             
-            
-            
             username = name.lower().replace(' ', '_').replace('.', '_').replace('-', '_')[:80]
             
             username = ''.join(c for c in username if c.isalnum() or c == '_')
             if not username:
                 
                 username = email.split('@')[0].lower()[:80]
-            
             
             base_username = username
             counter = 1
@@ -134,9 +125,6 @@ class Article(db.Model):
         if self.photo:
             return self.photo
         return self.placeholder_image_url(width, height)
-        base = (self.title or str(self.id) or "news").encode("utf-8", errors="ignore")
-        seed = hashlib.md5(base).hexdigest()[:16]
-        return f"https://picsum.photos/seed/{seed}/{width}/{height}"
 
     def get_sources(self):
         """Parsuje zdroje z obsahu článku, ak ide o multi-source formát, Skúsi dekódovať JSON z obsahu a vráti údaje o zdrojoch."""
@@ -151,7 +139,6 @@ class Article(db.Model):
             pass
         return None
 
-
 class ArticleReaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     article_id = db.Column(db.Integer, db.ForeignKey("article.id"), nullable=False)
@@ -160,7 +147,6 @@ class ArticleReaction(db.Model):
     date_reacted = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     
     __table_args__ = (db.UniqueConstraint('article_id', 'user_id'),)
-
 
 class Comment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -183,7 +169,6 @@ class Comment(db.Model):
             current = current.parent
         return chain
 
-
 class Discussion(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
@@ -197,7 +182,6 @@ class Discussion(db.Model):
     article = db.relationship("Article", backref="discussions", lazy=True)
     author = db.relationship("User", backref="discussions", lazy=True)
     comments = db.relationship("DiscussionComment", backref="discussion", lazy=True, cascade="all, delete-orphan")
-
 
 class DiscussionComment(db.Model):
     id = db.Column(db.Integer, primary_key=True)

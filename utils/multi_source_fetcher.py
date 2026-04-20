@@ -131,7 +131,6 @@ class MultiSourceNewsFetcher:
                         size = width * height if width and height else 100000  
                         images_found.append((url, size, 'media_content', width, height))
         
-        
         if hasattr(entry, 'media_thumbnail'):
             for thumb in entry.media_thumbnail:
                 url = thumb.get('url')
@@ -238,11 +237,10 @@ class MultiSourceNewsFetcher:
         return upgraded_url
 
     def _get_reliable_image_for_article(self, article_group: List[Dict]) -> Optional[str]:
-        """Vyberie spoľahlivý obrázok vo vhodnej kvalite pre článok."""
+        """Vyberie spoľahlivý obrázok z obrázkov ku každemu articel zdroji vo vhodnej kvalite pre multi-source článok."""
         all_images = []
         
         for article in article_group:
-            
             image_url = article.get('image')
             if image_url:
                 
@@ -344,7 +342,6 @@ class MultiSourceNewsFetcher:
         if len(content) <= max_length:
             return content
         
-        
         sentences = re.split(r'[.!?]\s+', content)
         summary = ""
         
@@ -356,7 +353,6 @@ class MultiSourceNewsFetcher:
                 summary += sentence + ". "
             else:
                 break
-        
         
         if not summary or len(summary) < 15:
             words = content[:max_length].split()
@@ -396,7 +392,6 @@ class MultiSourceNewsFetcher:
             
             model = None
             model_name = None
-            
             
             preferred_models = [
                 'gemini-2.5-flash',      
@@ -501,7 +496,6 @@ Bullet points:"""
         """Extrahuje hlavné body, ktoré zhrnú dôležité uhly naprieč zdrojmi."""
         if not source_summaries:
             return []
-        
         
         if self.gemini_api_key:
             gemini_bullets = self._generate_bullets_with_gemini(source_summaries, title)
@@ -655,7 +649,7 @@ Bullet points:"""
         return available_stories
     
     def fetch_multi_source_article(self, exclude_titles: List[str] = None) -> Optional[Dict]:
-        """Načíta a zoskupí články z viacerých zdrojov na rovnakú tému."""
+        """Finalna funkcia ktora pozbiera clanky, zoskupi ich, zosummarizuje ich, vyberie nejlepsi, vytvori bullet pointy"""
         if exclude_titles is None:
             exclude_titles = []
         
@@ -684,7 +678,6 @@ Bullet points:"""
                 if source_name in seen_sources:
                     continue
                 seen_sources.add(source_name)
-                
                 
                 summary = (article.get('summary', '') or 
                           article.get('description', '') or 
@@ -718,9 +711,8 @@ Bullet points:"""
                         'source': source_name,
                         'article_url': article_url
                     })
-            
+            #Kontrola počtu súhrnov v skupine
             print(f"Total sources with valid summaries: {len(source_summaries)}")
-            
             if len(source_summaries) >= 2:
                 print(f"✓ Successfully extracted {len(source_summaries)} summaries")
                 break
@@ -732,24 +724,23 @@ Bullet points:"""
         if len(source_summaries) < 2:
             print(f"✗ Could not find any story with at least 2 valid summaries after trying {min(5, len(available_stories))} stories")
             return None
-        
+        #Generovanie bullet pointov
         print(f"Successfully found story with {len(source_summaries)} sources")
         
         article_title = main_article.get('title', 'Breaking News')
-        
         bullet_points = self._extract_generalized_bullets(source_summaries, max_bullets=7, title=article_title)
-        
+
+        #kontrola bullet pointov
         if not bullet_points or len(bullet_points) < 2:
             print("Could not extract enough bullet points")
             return None
         
-#ukladanie zdrojov a bullet pointov
+    #ukladanie zdrojov a bullet pointov, json
         data_to_store = {
             'bullets': bullet_points,
             'sources': [{'source': s['source'], 'url': s['url']} for s in source_summaries]
         }
-        
-        
+        #vyber nahladoveho obrazku
         main_image = self._get_reliable_image_for_article(current_group) if current_group else None
         
         title = main_article.get('title', 'Breaking News')
