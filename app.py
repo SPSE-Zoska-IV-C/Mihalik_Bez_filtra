@@ -298,12 +298,16 @@ def map():
 @app.get("/api/articles/with-location")
 def get_articles_with_location():
     """API endpoint na získanie článkov s polohou pre mapu,JSON so zoznamom článkov, ktoré majú súradnice"""
-    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24) # cas po ktorom sa clanky vymazu
+    # ZAKOMENTOVANE: Filtrovanie len poslednych 24 hodin (pre DEBUG - aby videl stare clanky)
+    # Povodny kod na vratenie na 24 hodin:
+    # cutoff_time = datetime.now(timezone.utc) - timedelta(hours=24) # cas po ktorom sa clanky vymazu
+    # a do .filter() pridat: Article.date_posted >= cutoff_time
+    
     #kriteria pre nacitanie clanku na mapu
     articles = Article.query.filter(
         Article.latitude.isnot(None),
-        Article.longitude.isnot(None),
-        Article.date_posted >= cutoff_time 
+        Article.longitude.isnot(None)
+        # Article.date_posted >= cutoff_time  # ZAKOMENTOVANE - vidis vsetky clanky s polohou
     ).order_by(Article.date_posted.desc()).limit(100).all()
     
     articles_data = []
