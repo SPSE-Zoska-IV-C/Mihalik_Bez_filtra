@@ -273,7 +273,7 @@ def geocode_location(location_name: str) -> dict:
             "limit": 1
         }
         headers = {
-            "User-Agent": "BezFiltraNewsApp/1.0"
+            "User-Agent": "BezFiltraNewsApp/1.0"# user agent pre nominatim
         }
         response = requests.get(url, params=params, headers=headers, timeout=5)
         #Spracovanie odpovede
@@ -450,7 +450,6 @@ def new_discussion():
     article = Article.query.get_or_404(article_id) if article_id else None
     return render_template("discussion_new.html", article=article)
 
-
 @app.post("/discussions/<int:discussion_id>/delete")
 @login_required
 def delete_discussion(discussion_id: int):
@@ -460,12 +459,10 @@ def delete_discussion(discussion_id: int):
         flash("You are not allowed to delete that discussion.", "danger")
         return redirect(url_for("discussion_detail", discussion_id=discussion.id))
 
-    
     db.session.delete(discussion)
     db.session.commit()
     flash("Discussion deleted.", "success")
     return redirect(url_for("discussions"))
-
 
 @app.get("/discussions/<int:discussion_id>")
 def discussion_detail(discussion_id: int):
@@ -477,7 +474,6 @@ def discussion_detail(discussion_id: int):
         discussion_id=discussion.id
     ).order_by(DiscussionComment.date_posted.asc()).all()
 
-    
     comments_dict = {c.id: c for c in all_comments}
     for c in all_comments:
         if c.parent_id and c.parent_id in comments_dict:
@@ -493,7 +489,6 @@ def discussion_detail(discussion_id: int):
         discussion=discussion,
         comments=top_level_comments,
     )
-
 
 @app.post("/discussions/<int:discussion_id>/comment")
 @login_required
@@ -549,14 +544,14 @@ def fetch_article():
     multi_source_fetcher = None
     try:
         from utils.multi_source_fetcher import MultiSourceNewsFetcher
-        gemini_key = app.config.get("GEMINI_API_KEY", "")
+        gemini_key = app.config.get("GEMINI_API_KEY", "")#nacitanie gemini kluca
         multi_source_fetcher = MultiSourceNewsFetcher(gemini_api_key=gemini_key)
     except Exception as e:
         print(f"Error importing multi_source_fetcher: {e}")
         import traceback
         traceback.print_exc()
         multi_source_fetcher = None
-
+    #vsetky nadpisy clankov z databayz
     existing_titles = [a.title for a in Article.query.with_entities(Article.title).all()]
     
     data = None
@@ -574,12 +569,12 @@ def fetch_article():
         flash("Could not fetch an article right now. Please try again shortly.", "warning")
         return redirect(url_for("list_articles"))
 
-    
+    #kontrola databazy pre rovnaky clanok?
     existing = Article.query.filter(Article.title == data['title']).first()
     
     if not existing:
         try:
-            
+            #skratenie textov
             title = data['title'][:200] if len(data['title']) > 200 else data['title']
             summary = data.get('summary', '')[:500] if len(data.get('summary', '')) > 500 else data.get('summary', '')
             source_url = data.get('source_url', '')[:500] if len(data.get('source_url', '')) > 500 else data.get('source_url', '')
@@ -587,17 +582,16 @@ def fetch_article():
             if photo and len(photo) > 500:
                 photo = photo[:500]
             
-            
             print("Extracting location from article...")
-            location_data = extract_location_with_gemini(title, data['content'], summary)
+            location_data = extract_location_with_gemini(title, data['content'], summary)# volaneie extrahcie lokacie
             
             
-            if location_data.get("location_name") and not location_data.get("latitude"):
+            if location_data.get("location_name") and not location_data.get("latitude"):#ak nedostaneme suradnice pouuzijeme geokoding
                 print(f"Geocoding location: {location_data['location_name']}")
                 geocode_result = geocode_location(location_data["location_name"])
                 location_data["latitude"] = geocode_result.get("latitude")
                 location_data["longitude"] = geocode_result.get("longitude")
-            
+            #ukladanie clanku do databazy
             article = Article(
                 title=title,
                 content=data['content'],  

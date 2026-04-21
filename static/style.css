@@ -279,12 +279,28 @@ body[data-theme="dark"] .filter-link-clear:hover {
 }
 
 .reply-btn {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
   color: var(--muted) !important;
-  transition: color 0.2s ease;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+  font-size: inherit;
+  font-family: inherit;
 }
 
 .reply-btn:hover {
-  color: var(--accent) !important;
+  color: var(--muted) !important;
+  opacity: 0.7;
+}
+
+body[data-theme="dark"] .reply-btn {
+  color: var(--muted) !important;
+}
+
+body[data-theme="dark"] .reply-btn:hover {
+  color: var(--muted) !important;
+  opacity: 0.7;
 }
 
 .reply-form-container {

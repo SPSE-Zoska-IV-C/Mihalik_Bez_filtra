@@ -35,8 +35,8 @@ class MultiSourceNewsFetcher:
         "https://www.nbcnews.com/rss",  
         "https://feeds.cbsnews.com/CBSNewsMain",  
     ]
-    
-    def __init__(self, gemini_api_key: Optional[str] = None):
+    #pripravuje nástroj na sťahovanie RSS článkov s maskovaním ako normálny prehliadac a inicializáciou Gemini API.
+    def __init__(self, gemini_api_key: Optional[str] = None): 
         self.session = requests.Session()
         self.session.headers.update({
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -56,18 +56,17 @@ class MultiSourceNewsFetcher:
     def fetch_all_feeds(self) -> List[Dict]:
         """Načíta články zo všetkých RSS kanálov do zoznamu."""
         all_articles = []
-        
+        #iteracia cez rss kanaly
         for feed_url in self.RSS_FEEDS:
             try:
-                feed = feedparser.parse(feed_url)
+                feed = feedparser.parse(feed_url)#stiahnutie a parsovanie rss feedu z url
                 source_name = self._extract_source_name(feed_url)
                 
-                for entry in feed.entries[:50]:  
-                    
-                    summary_text = (entry.get('summary', '') or 
+                for entry in feed.entries[:50]:   #prvych 50 clankov z kazdeho feedu
+                    summary_text = (entry.get('summary', '') or  #ziskava zhrnutia
                                    entry.get('description', '') or
                                    entry.get('content', [{}])[0].get('value', '') if isinstance(entry.get('content'), list) else '')
-                    
+                    #slovník s metadatami článku
                     article = {
                         'title': entry.get('title', ''),
                         'link': entry.get('link', ''),
@@ -83,7 +82,7 @@ class MultiSourceNewsFetcher:
             except Exception as e:
                 print(f"Error fetching feed {feed_url}: {e}")
                 continue
-        return all_articles
+        return all_articles # vracia zoznam clankov tvorenych slovnikmy
     
     def _extract_source_name(self, feed_url: str) -> str:
         """Získa názov zdroja z URL RSS kanála."""
@@ -119,18 +118,18 @@ class MultiSourceNewsFetcher:
         article_link = entry.get('link', '')
         images_found = []
         
+        #skontroluje ci RSS zaznam ma media_conten, hlada obrazky
         if hasattr(entry, 'media_content'):
             for media in entry.media_content:
                 if media.get('type', '').startswith('image'):
                     url = media.get('url')
                     if url:
                         url = self._make_absolute_url(url, article_link)
-                        
                         width = int(media.get('width', 0) or 0)
                         height = int(media.get('height', 0) or 0)
                         size = width * height if width and height else 100000  
                         images_found.append((url, size, 'media_content', width, height))
-        
+        #Rovnaký proces ako media_content, ale pre thumbnail obrázky
         if hasattr(entry, 'media_thumbnail'):
             for thumb in entry.media_thumbnail:
                 url = thumb.get('url')
@@ -140,8 +139,7 @@ class MultiSourceNewsFetcher:
                     height = int(thumb.get('height', 0) or 0)
                     size = width * height if width and height else 50000  
                     images_found.append((url, size, 'thumbnail', width, height))
-        
-        
+        #hlada img tagy v html summary alebo description
         summary = entry.get('summary', '') or entry.get('description', '')
         if summary:
             soup = BeautifulSoup(summary, 'html.parser')
@@ -158,7 +156,6 @@ class MultiSourceNewsFetcher:
                     images_found.append((src, size, 'html', width, height))
         
         if images_found:
-            
             images_found.sort(key=lambda x: (
                 x[2] == 'media_content',  
                 x[2] == 'thumbnail',      
@@ -166,10 +163,11 @@ class MultiSourceNewsFetcher:
             ), reverse=True)
             
             best_url = images_found[0][0]
-            
+            #tiedenie obrazzkov podla priority
+
             if images_found[0][2] == 'thumbnail' or (images_found[0][3] > 0 and images_found[0][3] < 400):
                 best_url = self._upgrade_image_resolution(best_url)
-            
+            #ak obrazok je thumbmail alebo ma menej ako 400 pixelov zavola funkciu na odstranenie parametrov
             return best_url
         
         return None
@@ -197,7 +195,8 @@ class MultiSourceNewsFetcher:
             return image_url
         
         upgraded_url = image_url
-        
+
+        #Odstránenie veľkostných parametrov z URL
         patterns_to_remove = [
             r'[?&](w|width)=\d+',
             r'[?&](h|height)=\d+',
@@ -209,8 +208,7 @@ class MultiSourceNewsFetcher:
         
         for pattern in patterns_to_remove:
             upgraded_url = re.sub(pattern, '', upgraded_url, flags=re.IGNORECASE)
-        
-        
+        #Nahradenie veľkostných path segmentov
         replacements = [
             ('/thumb/', '/'),
             ('/thumbnail/', '/'),
@@ -227,8 +225,7 @@ class MultiSourceNewsFetcher:
             if old in upgraded_url.lower():
                 upgraded_url = upgraded_url.replace(old, new, 1).replace(old.upper(), new, 1)
                 break
-        
-        
+        #odstranovanie znakov & a ?
         upgraded_url = re.sub(r'[?&]+', '&', upgraded_url)
         upgraded_url = upgraded_url.rstrip('&?')
         if upgraded_url.endswith('&'):
@@ -333,18 +330,18 @@ class MultiSourceNewsFetcher:
             return ""
 
         try:
-            soup = BeautifulSoup(content, 'html.parser')
+            soup = BeautifulSoup(content, 'html.parser')#Extrauje iba text bez HTML tagov
             content = soup.get_text()
         except:
             pass
         
-        content = ' '.join(content.split())
+        content = ' '.join(content.split()) #Odstrani zbytocne medzery, tabulatory, nove riadky
         if len(content) <= max_length:
             return content
         
-        sentences = re.split(r'[.!?]\s+', content)
+        sentences = re.split(r'[.!?]\s+', content) #Regex r'[.!?]\s+' rozdelí text na vety podľa ., ! alebo ?
         summary = ""
-        
+        #Iteruje cez všetky vety
         for sentence in sentences:
             sentence = sentence.strip()
             if not sentence or len(sentence) < 5:  
@@ -360,18 +357,16 @@ class MultiSourceNewsFetcher:
                 summary = ' '.join(words[:-1]) + "..."
             else:
                 summary = content[:max_length] + "..."
-        return summary.strip()
+        return summary.strip()#Vrati ocistene zhrnutie bez mezer na zaciatku a konci
     
     def _generate_bullets_with_gemini(self, source_summaries: List[Dict], title: str) -> List[str]:
         """Vygeneruje zoznam bodov o článku pomocou Gemini API."""
         if not self.gemini_api_key:
             print("Gemini API key not found, falling back to basic extraction")
             return []
-        
         try:
             import google.generativeai as genai
             genai.configure(api_key=self.gemini_api_key)
-            
             try:
                 models = genai.list_models()
                 available_models = []
@@ -408,11 +403,11 @@ class MultiSourceNewsFetcher:
                     print(f"✓ Successfully initialized {model_name} model")
                     break
                 except Exception as e:
-                    print(f"✗ Failed to initialize {model_name}: {e}")
+                    print(f"X Failed to initialize {model_name}: {e}")
                     continue
             
             if model is None:
-                print("✗ Could not initialize any Gemini model")
+                print("X Could not initialize any Gemini model")
                 return []
             
             sources_text = ""
@@ -483,11 +478,11 @@ Bullet points:"""
                 print(f"✓ Generated {len(bullets)} bullet points using Gemini")
                 return bullets[:7]  
             else:
-                print("✗ Gemini returned no valid bullet points")
+                print("X Gemini returned no valid bullet points")
                 return []
                 
         except Exception as e:
-            print(f"✗ Error using Gemini API: {e}")
+            print(f"X Error using Gemini API: {e}")
             import traceback
             traceback.print_exc()
             return []
@@ -502,6 +497,7 @@ Bullet points:"""
             if gemini_bullets:
                 return gemini_bullets
         
+        #Iteruje všetky sumarizácie zo zdrojov,
         print("Using fallback bullet extraction method")
         combined_texts = []
         for source in source_summaries:
@@ -511,12 +507,12 @@ Bullet points:"""
             soup = BeautifulSoup(raw, 'html.parser')
             cleaned = ' '.join(soup.get_text().split())
             if cleaned:
-                combined_texts.append(cleaned)
+                combined_texts.append(cleaned)#texty sa spoja dokopy
         
-        full_text = " ".join(combined_texts)
+        full_text = " ".join(combined_texts)#Spojí všetky texty do jedného
         if not full_text:
-            return []
-        
+            return [] 
+        #Regex [.!?]\s+ rozdeli text na vety (podla ., !, ? + medzera),Filtruje vety: len vety s 30-200 znakmi
         sentences = re.split(r'[.!?]\s+', full_text)
         sentences = [s.strip() for s in sentences if 30 <= len(s.strip()) <= 200]
         if not sentences:
@@ -530,37 +526,40 @@ Bullet points:"""
             'she', 'too', 'use', 'from', 'into', 'that', 'with', 'have', 'this', 'they'
         }
         filtered_words = [w for w in words if len(w) > 3 and w not in stop_words]
-        word_freq = Counter(filtered_words)
-        
+        word_freq = Counter(filtered_words)# frekvencia ostatnych slov
+        #skorovanie viet
         scored_sentences = []
         for sentence in sentences:
             lower = sentence.lower()
             score = 0
             if any(char.isdigit() for char in sentence):
-                score += 2
+                score += 2 #=datumy maju 2 body
             if 60 <= len(sentence) <= 160:
-                score += 1
+                score += 1 #dlzka je dolezita
             for word, freq in word_freq.items():
                 if word in lower:
                     score += freq
             scored_sentences.append((score, sentence))
         
         scored_sentences.sort(reverse=True, key=lambda x: x[0])
-        
+        #vzyber viet od najvacsieho po najmenensie skore
         bullets: List[str] = []
         seen_word_sets: List[set] = []
         for _, sentence in scored_sentences:
             words_set = set(re.findall(r'\b\w+\b', sentence.lower()))
             if not words_set:
                 continue
+
+            #kontrola duplikaqtov
             duplicate = False
             for seen in seen_word_sets:
                 overlap = len(words_set & seen)
-                if overlap / (max(len(words_set), len(seen)) or 1) >= 0.55:
+                if overlap / (max(len(words_set), len(seen)) or 1) >= 0.55: #jaccardov koeficient na 0.55 kontroluje podobnost viet
                     duplicate = True
                     break
+
             if duplicate:
-                continue
+                continue #preskoci duplikat
             bullets.append(sentence)
             seen_word_sets.append(words_set)
             if len(bullets) >= max_bullets:
@@ -639,9 +638,9 @@ Bullet points:"""
                 print(f"  ✓ NEW: '{main_title[:60]}...' ({source_count} sources)")
             else:
                 if not is_new:
-                    print(f"  ✗ SKIP: '{main_title[:60]}...' (similarity: {max_similarity:.2f}, already fetched)")
+                    print(f"  X SKIP: '{main_title[:60]}...' (similarity: {max_similarity:.2f}, already fetched)")
                 else:
-                    print(f"  ✗ SKIP: '{main_title[:60]}...' (only {source_count} sources)")
+                    print(f"  X SKIP: '{main_title[:60]}...' (only {source_count} sources)")
         
         available_stories.sort(key=lambda x: (-x['source_count'], x['max_similarity']))
         
@@ -653,15 +652,15 @@ Bullet points:"""
         if exclude_titles is None:
             exclude_titles = []
         
-        available_stories = self.analyze_available_stories(exclude_titles)
+        available_stories = self.analyze_available_stories(exclude_titles)#funkcia vraca zoznam pouzitelnych clankov
         
         if not available_stories:
             print("No new stories found that are covered by multiple sources")
             return None
         
-        print(f"\nPhase 2: Fetching details for best story...")
+        print(f"\nPhase 2: Fetching details for best story...")#Vypíše, ktorý príbeh sa vybral (prvý v zozname = s najviac zdrojmi)
         print(f"Selected: '{available_stories[0]['title'][:60]}...' ({available_stories[0]['source_count']} sources)")
-        
+        #prehladavame prvých 5 príbehov(podla poctu zdrojov)
         for story_idx, selected_story in enumerate(available_stories[:5]):  
             current_group = selected_story['group']
             print(f"\nTrying story {story_idx + 1}: '{selected_story['title'][:60]}...'")
@@ -671,14 +670,15 @@ Bullet points:"""
             source_summaries = []
             images = []
             seen_sources = set()  
-            
+
+            #Prehľadá všetky články v gruppe
             for article in current_group:
                 source_name = article.get('source', 'Unknown')
                 
                 if source_name in seen_sources:
                     continue
                 seen_sources.add(source_name)
-                
+                #Fallback logika: 
                 summary = (article.get('summary', '') or 
                           article.get('description', '') or 
                           article.get('content', '') or
@@ -695,10 +695,10 @@ Bullet points:"""
                         })
                         print(f"  ✓ Added summary from {source_name}: {len(summarized)} chars")
                     else:
-                        print(f"  ✗ Skipped {source_name}: summary too short after processing")
+                        print(f"  X Skipped {source_name}: summary too short after processing")
                 else:
-                    print(f"  ✗ Skipped {source_name}: no summary available")
-                
+                    print(f"  X Skipped {source_name}: no summary available")
+                #Extrahovanie obrázkov
                 if article.get('image'):
                     img_url = article['image']
                     
@@ -711,20 +711,20 @@ Bullet points:"""
                         'source': source_name,
                         'article_url': article_url
                     })
-            #Kontrola počtu súhrnov v skupine
+            #Kontrola počtu zdrojov v skupine
             print(f"Total sources with valid summaries: {len(source_summaries)}")
             if len(source_summaries) >= 2:
                 print(f"✓ Successfully extracted {len(source_summaries)} summaries")
                 break
             else:
-                print(f"✗ Story {story_idx + 1} failed: only {len(source_summaries)} valid summaries, trying next...")
+                print(f"X Story {story_idx + 1} failed: only {len(source_summaries)} valid summaries, trying next...")
                 source_summaries = []  
                 continue
         
         if len(source_summaries) < 2:
-            print(f"✗ Could not find any story with at least 2 valid summaries after trying {min(5, len(available_stories))} stories")
+            print(f"X Could not find any story with at least 2 valid summaries after trying {min(5, len(available_stories))} stories")
             return None
-        #Generovanie bullet pointov
+        #Generovanie bullet pointov, vstup je zoznam zhrnutí zo zdrojov
         print(f"Successfully found story with {len(source_summaries)} sources")
         
         article_title = main_article.get('title', 'Breaking News')
@@ -735,7 +735,7 @@ Bullet points:"""
             print("Could not extract enough bullet points")
             return None
         
-    #ukladanie zdrojov a bullet pointov, json
+    #ukladanie zdrojov a bullet pointov, do jsonu ktory sa ukada do databazy
         data_to_store = {
             'bullets': bullet_points,
             'sources': [{'source': s['source'], 'url': s['url']} for s in source_summaries]
